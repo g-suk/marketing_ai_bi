@@ -207,23 +207,25 @@ SELECT SNOWFLAKE.CORTEX.AGENT(
 
 ## Part 5: Build Your Dashboard (40-55 min)
 
-This is the creative section! You'll use **Cortex Code** to build a Streamlit dashboard by pasting progressive prompts.
+This is the creative section! You'll use **Cortex Code** to build a Streamlit dashboard in a single prompt.
 
 ### Getting Started
 
 1. Open Cortex Code in your Snowflake account
 2. Start a new conversation
-3. Paste the prompts below one at a time
+3. Paste the prompt from `prompts/01_build_dashboard.md`
 
-### Prompt Sequence
+This single prompt gives Cortex Code everything it needs to generate a full 5-page dashboard with KPIs, channel analytics, forecasting, AI insights, and the Cortex Agent chat interface.
 
-Paste each prompt, review the generated code, tweak to your liking, then move to the next:
+### Make It Your Own
 
-1. **Foundation + KPIs** -- see `prompts/01_foundation_kpis.md`
-2. **Channel Deep Dive** -- see `prompts/02_channel_deep_dive.md`
-3. **Forecasting & Anomalies** -- see `prompts/03_forecasting_anomalies.md`
-4. **AI Insights** -- see `prompts/04_ai_insights.md`
-5. **Cortex Agent** -- see `prompts/05_cortex_agent.md`
+Once the base app is running, check out `prompts/02_enhancements.md` for follow-up prompts you can paste to add features like:
+- Dark theme and brand colors
+- AI-generated executive summaries
+- Customer segmentation drilldowns
+- Anomaly drill-through with AI explanations
+- Marketing funnel visualizations
+- And more
 
 ### Tips
 
