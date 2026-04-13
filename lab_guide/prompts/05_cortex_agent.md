@@ -6,7 +6,7 @@ Paste this into Cortex Code:
 
 Add a chat interface to my Streamlit app (either on the AI Insights page or as its own tab) that lets users ask natural language questions about the marketing data.
 
-Use Snowflake's Cortex Agent API. The agent is named SUMMIT_GEAR_AGENT in MARKETING_AI_BI.DEMO_DATA and is backed by a semantic view called SV_SUMMIT_GEAR_MARKETING that covers the CAMPAIGNS, ORDERS, CUSTOMERS, MARKETING_SPEND, WHOLESALE_PARTNERS, DT_CAMPAIGN_METRICS, DT_PARTNER_PERFORMANCE, and AI_SENTIMENT_RESULTS tables.
+Use Snowflake's Cortex Agent API. The agent is named SUMMIT_GEAR_AGENT in MARKETING_AI_BI.MARKETING_ANALYTICS and is backed by a semantic view called SV_SUMMIT_GEAR_MARKETING that covers the CAMPAIGNS, ORDERS, CUSTOMERS, MARKETING_SPEND, WHOLESALE_PARTNERS, DT_CAMPAIGN_METRICS, DT_PARTNER_PERFORMANCE, and AI_SENTIMENT_RESULTS tables.
 
 Show a few suggested starter questions as clickable chips:
 - "Why did DTC sales drop in March?"

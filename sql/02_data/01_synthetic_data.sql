@@ -14,7 +14,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_RAW;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------

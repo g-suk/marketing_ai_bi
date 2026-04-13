@@ -5,7 +5,7 @@
   Creates views that join synthetic data to Marketplace shared databases.
   
   IMPORTANT: Before running this script, install the Marketplace listings and
-  run the GRANT statements in 01_setup/01_rbac_database_schema.sql.
+  run the GRANT statements in 01_setup/setup.sql.
   
   Verified database/schema/table names (Apr 2026):
     Snowflake Public Data  -> SNOWFLAKE_PUBLIC_DATA_PAID.PUBLIC_DATA
@@ -15,7 +15,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_RAW;
 
 ----------------------------------------------------------------------
 -- Tier 1: Snowflake Public Data -- Economic indicators for FORECAST

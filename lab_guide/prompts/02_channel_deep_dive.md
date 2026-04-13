@@ -14,4 +14,4 @@ Add a second page called "Channel Deep Dive" to my Streamlit app. This page shou
 - Bar chart of sell-through rate by wholesale partner (top 15)
 - Comparison of trade promo campaigns: spend vs incremental wholesale revenue
 
-Use the DT_CAMPAIGN_METRICS and DT_PARTNER_PERFORMANCE dynamic tables in MARKETING_AI_BI.DEMO_DATA.
+Use the MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS and MARKETING_AI_BI.MARKETING_ANALYTICS.DT_PARTNER_PERFORMANCE dynamic tables.

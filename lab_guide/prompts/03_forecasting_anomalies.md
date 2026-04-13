@@ -16,4 +16,4 @@ Add a third page called "Forecasting & Anomalies" to my Streamlit app.
 - Add a selectbox to toggle between "Ad Spend", "DTC Conversion Rate", "Wholesale Orders".
 - When a user clicks or hovers on an anomaly point, show the date and magnitude of the deviation.
 
-Use tables in MARKETING_AI_BI.DEMO_DATA.
+Use tables in MARKETING_AI_BI.MARKETING_RAW for results (FORECAST_RESULTS, ANOMALY_DETECTION_RESULTS) and MARKETING_AI_BI.MARKETING_ANALYTICS for dynamic tables (DT_DAILY_REVENUE).

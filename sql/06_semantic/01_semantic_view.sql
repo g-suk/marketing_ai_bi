@@ -1,38 +1,38 @@
 /*=============================================================================
   Summit Gear Co. -- Marketing AI+BI Lab
   06_semantic/01_semantic_view.sql
-  
+
   Creates a semantic view over the marketing data model.
   This view backs the Cortex Agent for natural language Q&A.
-  
+
   Requires: All source tables, dynamic tables, and AI result tables to exist.
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_MARKETING
   TABLES (
-    campaigns AS MARKETING_AI_BI.DEMO_DATA.CAMPAIGNS
+    campaigns AS MARKETING_AI_BI.MARKETING_RAW.CAMPAIGNS
       PRIMARY KEY (campaign_id)
       COMMENT = 'Marketing campaigns across DTC and wholesale channels',
-    orders AS MARKETING_AI_BI.DEMO_DATA.ORDERS
+    orders AS MARKETING_AI_BI.MARKETING_RAW.ORDERS
       PRIMARY KEY (order_id)
       COMMENT = 'Customer orders across DTC and wholesale channels',
-    customers AS MARKETING_AI_BI.DEMO_DATA.CUSTOMERS
+    customers AS MARKETING_AI_BI.MARKETING_RAW.CUSTOMERS
       PRIMARY KEY (customer_id)
       COMMENT = 'Customer profiles with demographics',
-    spend AS MARKETING_AI_BI.DEMO_DATA.MARKETING_SPEND
+    spend AS MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND
       PRIMARY KEY (spend_id)
       COMMENT = 'Daily marketing spend by campaign',
-    partners AS MARKETING_AI_BI.DEMO_DATA.WHOLESALE_PARTNERS
+    partners AS MARKETING_AI_BI.MARKETING_RAW.WHOLESALE_PARTNERS
       PRIMARY KEY (partner_id)
       COMMENT = 'Wholesale retail partner profiles',
-    campaign_metrics AS MARKETING_AI_BI.DEMO_DATA.DT_CAMPAIGN_METRICS
+    campaign_metrics AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS
       PRIMARY KEY (campaign_id)
       COMMENT = 'Campaign-level KPIs including spend, conversions, CPA, ROAS',
-    partner_perf AS MARKETING_AI_BI.DEMO_DATA.DT_PARTNER_PERFORMANCE
+    partner_perf AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_PARTNER_PERFORMANCE
       PRIMARY KEY (partner_id)
       COMMENT = 'Wholesale partner performance metrics'
   )

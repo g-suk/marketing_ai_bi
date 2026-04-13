@@ -1,7 +1,7 @@
 /*=============================================================================
   Summit Gear Co. -- Marketing AI+BI Lab
   teardown_all.sql
-  
+
   Cleanly removes all lab resources. Run as ACCOUNTADMIN.
 =============================================================================*/
 

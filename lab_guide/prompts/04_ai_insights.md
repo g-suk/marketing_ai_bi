@@ -11,4 +11,4 @@ Add a fourth page called "AI Insights" to my Streamlit app.
 - Show a pie or donut chart of campaign performance tiers from AI_CLASSIFY_RESULTS (columns: campaign_id, campaign_name, channel, sub_channel, roas, performance_tier).
 - Show a sample of AI_EXTRACT results in an expandable table -- the structured fields extracted from reviews.
 
-Use tables in MARKETING_AI_BI.DEMO_DATA.
+Use tables in MARKETING_AI_BI.MARKETING_RAW for AI results and MARKETING_AI_BI.MARKETING_ANALYTICS for dynamic tables.

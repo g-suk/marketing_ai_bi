@@ -4,46 +4,56 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ## Quick Start
 
-### Option A: Run from Snowflake Workspaces (Recommended)
-
-1. **Create a Git Integration** in your Snowflake account:
+### Step 1: Create the Database (required before Git integration)
 
 ```sql
 USE ROLE ACCOUNTADMIN;
 
+CREATE OR REPLACE DATABASE MARKETING_AI_BI;
+CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_RAW;
+```
+
+### Step 2: Connect via Git Integration (Recommended)
+
+```sql
 CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/g-suk')
   ENABLED = TRUE;
 
-CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO
+CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO
   API_INTEGRATION = github_api_integration
   ORIGIN = 'https://github.com/g-suk/marketing_ai_bi.git';
 ```
 
-2. **Open a Snowsight SQL Worksheet** and run:
+### Step 3: Fetch and Run Scripts
 
 ```sql
-ALTER GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO FETCH;
-
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO/branches/main/deploy_all.sql;
+ALTER GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO FETCH;
 ```
 
-3. Install Marketplace listings (see lab guide below)
-4. Follow `lab_guide/LAB_GUIDE.md`
+Then run each step individually from the repo (see lab guide for order):
 
-### Option B: Copy/Paste
+```sql
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/01_setup/setup.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/02_data/01_synthetic_data.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/03_dynamic_tables/01_dynamic_tables.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/04_ml/01_forecast.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/04_ml/02_anomaly_detection.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/05_ai/01_ai_functions.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/06_semantic/01_semantic_view.sql;
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/06_semantic/02_cortex_agent.sql;
+```
 
-1. Open a Snowsight SQL worksheet
-2. Copy the contents of `deploy_all.sql` and execute as ACCOUNTADMIN
-3. Install Marketplace listings (see lab guide)
-4. Follow `lab_guide/LAB_GUIDE.md`
+### Alternative: Copy/Paste
+
+Open a Snowsight SQL worksheet and run each SQL file in order from the `sql/` folder.
 
 ## What You'll Build
 
-- **Synthetic dataset:** 6 tables for "Summit Gear Co." (DTC + wholesale outdoor brand)
+- **Synthetic dataset:** 6 tables in `MARKETING_RAW` for "Summit Gear Co." (DTC + wholesale outdoor brand)
 - **Marketplace enrichment:** Economic indicators, consumer demographics, weather data
-- **Dynamic tables:** 6 declarative transformation layers
+- **Dynamic tables:** 6 declarative transformation layers in `MARKETING_ANALYTICS`
 - **Cortex ML:** Revenue forecasting + anomaly detection
 - **Cortex AI:** Sentiment analysis, classification, extraction, summarization
 - **Semantic view + Agent:** Natural language Q&A over marketing data
@@ -74,15 +84,23 @@ GRANT IMPORTED PRIVILEGES ON DATABASE FROSTBYTE_WEATHERSOURCE    TO ROLE MARKETI
 
 ```
 sql/
-  01_setup/            -- RBAC, database, schema
-  02_data/             -- Synthetic data + marketplace enrichment
-  03_dynamic_tables/   -- 6 dynamic tables
-  04_ml/               -- FORECAST + ANOMALY_DETECTION
-  05_ai/               -- AI functions
-  06_semantic/         -- Semantic view + Cortex Agent
-lab_guide/             -- Step-by-step instructions + Cortex Code prompts
-streamlit/             -- Backup reference app
+  01_setup/setup.sql             -- RBAC, role, schemas, stages
+  02_data/                       -- Synthetic data + marketplace enrichment
+  03_dynamic_tables/             -- 6 dynamic tables (MARKETING_ANALYTICS)
+  04_ml/                         -- FORECAST + ANOMALY_DETECTION
+  05_ai/                         -- AI functions
+  06_semantic/                   -- Semantic view + Cortex Agent (MARKETING_ANALYTICS)
+lab_guide/                       -- Step-by-step instructions + Cortex Code prompts
+streamlit/                       -- Backup reference app
+teardown_all.sql                 -- Clean up everything
 ```
+
+## Schemas
+
+| Schema | Purpose |
+|--------|---------|
+| `MARKETING_RAW` | Source tables, ML results, AI results, marketplace views |
+| `MARKETING_ANALYTICS` | Dynamic tables, semantic view, Cortex Agent |
 
 ## Teardown
 

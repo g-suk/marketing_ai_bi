@@ -12,7 +12,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_RAW;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
@@ -20,7 +20,7 @@ USE WAREHOUSE COMPUTE_WH;
 ----------------------------------------------------------------------
 CREATE OR REPLACE VIEW V_FORECAST_TRAINING AS
 SELECT ds, series, y
-FROM DT_FORECAST_INPUT
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_FORECAST_INPUT
 WHERE ds < '2025-10-01';
 
 ----------------------------------------------------------------------

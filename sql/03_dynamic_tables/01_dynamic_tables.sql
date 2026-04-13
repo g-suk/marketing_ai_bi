@@ -1,17 +1,16 @@
 /*=============================================================================
   Summit Gear Co. -- Marketing AI+BI Lab
   03_dynamic_tables/01_dynamic_tables.sql
-  
-  Creates 6 dynamic tables that transform raw source data into analytics-ready
-  tables. These replace traditional CTAS or scheduled tasks with a declarative
-  transformation layer that Snowflake keeps fresh automatically.
-  
+
+  Creates 6 dynamic tables in the MARKETING_ANALYTICS schema that transform
+  raw source data from MARKETING_RAW into analytics-ready tables.
+
   Participants can inspect the lineage graph in Snowsight:
-  Data > Databases > MARKETING_AI_BI > DEMO_DATA > Dynamic Tables
+  Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
@@ -28,7 +27,7 @@ SELECT
     SUM(quantity)                   AS total_units,
     ROUND(SUM(revenue), 2)         AS total_revenue,
     ROUND(AVG(revenue), 2)         AS avg_order_value
-FROM ORDERS
+FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
 GROUP BY order_date, channel;
 
 ----------------------------------------------------------------------
@@ -64,7 +63,7 @@ SELECT
          THEN ROUND(COALESCE(s.total_clicks, 0)::FLOAT / s.total_impressions * 100, 3)
          ELSE NULL
     END AS ctr_pct
-FROM CAMPAIGNS c
+FROM MARKETING_AI_BI.MARKETING_RAW.CAMPAIGNS c
 LEFT JOIN (
     SELECT
         campaign_id,
@@ -72,14 +71,14 @@ LEFT JOIN (
         SUM(impressions)  AS total_impressions,
         SUM(clicks)       AS total_clicks,
         SUM(conversions)  AS total_conversions
-    FROM MARKETING_SPEND
+    FROM MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND
     GROUP BY campaign_id
 ) s ON c.campaign_id = s.campaign_id
 LEFT JOIN (
     SELECT
         campaign_id,
         SUM(revenue) AS campaign_revenue
-    FROM ORDERS
+    FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
     GROUP BY campaign_id
 ) o ON c.campaign_id = o.campaign_id;
 
@@ -102,14 +101,13 @@ SELECT
     ROUND(SUM(o.revenue), 2)   AS total_revenue,
     ROUND(AVG(o.revenue), 2)   AS avg_order_value,
     ROUND(SUM(o.revenue) / NULLIF(wp.annual_volume, 0) * 100, 1) AS revenue_attainment_pct
-FROM WHOLESALE_PARTNERS wp
-LEFT JOIN ORDERS o ON wp.partner_id = o.wholesale_partner_id
+FROM MARKETING_AI_BI.MARKETING_RAW.WHOLESALE_PARTNERS wp
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.ORDERS o ON wp.partner_id = o.wholesale_partner_id
 GROUP BY wp.partner_id, wp.partner_name, wp.region, wp.tier,
          wp.avg_sell_through_rate, wp.annual_volume;
 
 ----------------------------------------------------------------------
 -- 4. DT_CUSTOMER_SEGMENTS -- Enriched customer segments
---    (Falls back gracefully if Marketplace data not yet installed)
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_CUSTOMER_SEGMENTS
     TARGET_LAG = 'DOWNSTREAM'
@@ -137,10 +135,10 @@ SELECT
     END AS value_tier,
     o.total_orders,
     o.total_revenue
-FROM CUSTOMERS c
+FROM MARKETING_AI_BI.MARKETING_RAW.CUSTOMERS c
 LEFT JOIN (
     SELECT customer_id, COUNT(*) AS total_orders, SUM(revenue) AS total_revenue
-    FROM ORDERS
+    FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
     GROUP BY customer_id
 ) o ON c.customer_id = o.customer_id;
 
@@ -181,5 +179,5 @@ SELECT
          THEN ROUND(SUM(conversions)::FLOAT / SUM(clicks) * 100, 3)
          ELSE 0
     END AS conversion_rate_pct
-FROM MARKETING_SPEND
+FROM MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND
 GROUP BY spend_date, channel;

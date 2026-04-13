@@ -14,7 +14,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_RAW;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
@@ -47,7 +47,7 @@ SELECT
         || ', and ' || cm.total_conversions || ' conversions on a budget of $' || cm.budget || '.',
         ['Top Performer', 'Solid Performer', 'Average', 'Underperformer', 'Needs Review']
     ):label::VARCHAR AS performance_tier
-FROM DT_CAMPAIGN_METRICS cm;
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS cm;
 
 ----------------------------------------------------------------------
 -- 3. AI_EXTRACT -- Structured fields from review text
@@ -95,7 +95,7 @@ SELECT
         || '. ROAS: ' || COALESCE(cm.roas::VARCHAR, 'N/A')
         || '. CPA: $' || COALESCE(cm.cpa::VARCHAR, 'N/A') || '.'
     ) AS executive_summary
-FROM DT_CAMPAIGN_METRICS cm;
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS cm;
 
 ----------------------------------------------------------------------
 -- 5. AI_AGG -- Theme aggregation by channel

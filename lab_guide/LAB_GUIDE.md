@@ -16,30 +16,30 @@
 
 If you want to run the lab scripts directly from Snowflake Workspaces via Git integration:
 
-### 0.1 Create a Git Integration
+### 0.1 Create the Database and Schema
 
 As ACCOUNTADMIN, run:
 
 ```sql
 USE ROLE ACCOUNTADMIN;
 
+CREATE OR REPLACE DATABASE MARKETING_AI_BI;
+CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_RAW;
+```
+
+### 0.2 Create a Git Integration
+
+```sql
 CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/g-suk')
   ENABLED = TRUE;
 ```
 
-### 0.2 Create the Database First (needed for the Git Repository object)
-
-```sql
-CREATE OR REPLACE DATABASE MARKETING_AI_BI;
-CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.DEMO_DATA;
-```
-
 ### 0.3 Create the Git Repository
 
 ```sql
-CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO
+CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO
   API_INTEGRATION = github_api_integration
   ORIGIN = 'https://github.com/g-suk/marketing_ai_bi.git';
 ```
@@ -47,34 +47,38 @@ CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO
 ### 0.4 Fetch and Browse
 
 ```sql
-ALTER GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO FETCH;
+ALTER GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO FETCH;
 
--- List files in the repo
-SHOW GIT BRANCHES IN MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO;
-
--- Run the deploy script directly from the repo
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO/branches/main/deploy_all.sql;
+SHOW GIT BRANCHES IN MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO;
 ```
 
-> **Tip:** You can also browse the repository files in Snowsight under **Data > Databases > MARKETING_AI_BI > DEMO_DATA > Git Repositories**.
+> **Tip:** You can browse the repository files in Snowsight under **Data > Databases > MARKETING_AI_BI > MARKETING_RAW > Git Repositories**.
 
 ---
 
 ## Part 1: Setup (0-5 min)
 
-### 1.1 Run the Deploy Script
+### 1.1 Run the Setup Script
 
-**Option A (Git):** If you set up the Git integration above, the deploy script already ran.
+**Option A (Git):**
+```sql
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/01_setup/setup.sql;
+```
 
-**Option B (Copy/Paste):** Open a Snowsight SQL worksheet and paste the contents of `deploy_all.sql`. Execute it.
+**Option B (Copy/Paste):** Open a Snowsight SQL worksheet and paste the contents of `sql/01_setup/setup.sql`. Execute it.
 
 This creates:
 - Role: `MARKETING_LAB_ROLE`
-- Database: `MARKETING_AI_BI` with schema `DEMO_DATA`
-- 6 source tables with synthetic data
-- 6 dynamic tables for analytics transformations
+- Schema: `MARKETING_ANALYTICS` (for dynamic tables)
+- Stages for Streamlit and data
 
-Verify with the row count query at the bottom of the script:
+### 1.2 Load Synthetic Data
+
+```sql
+EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/02_data/01_synthetic_data.sql;
+```
+
+Verify with the row count query:
 
 | Table | Expected Rows |
 |-------|--------------|
@@ -85,7 +89,7 @@ Verify with the row count query at the bottom of the script:
 | MARKETING_SPEND | ~4,000 |
 | PRODUCT_REVIEWS | 1,500 |
 
-### 1.2 Install Marketplace Listings
+### 1.3 Install Marketplace Listings
 
 Navigate to **Data Products > Marketplace** and install these free listings:
 
@@ -120,21 +124,25 @@ Run `sql/02_data/02_marketplace_enrichment.sql` to create enrichment views.
 
 Test a sample query:
 ```sql
-SELECT * FROM V_ECONOMIC_INDICATORS LIMIT 10;
-SELECT * FROM V_CUSTOMER_ENRICHMENT LIMIT 10;
-SELECT * FROM V_NATIONAL_WEATHER WHERE weather_date >= '2024-07-01' LIMIT 10;
+SELECT * FROM MARKETING_AI_BI.MARKETING_RAW.V_ECONOMIC_INDICATORS LIMIT 10;
+SELECT * FROM MARKETING_AI_BI.MARKETING_RAW.V_CUSTOMER_ENRICHMENT LIMIT 10;
+SELECT * FROM MARKETING_AI_BI.MARKETING_RAW.V_NATIONAL_WEATHER WHERE weather_date >= '2024-07-01' LIMIT 10;
 ```
 
-### 2.2 Explore Dynamic Table Lineage
+### 2.2 Create Dynamic Tables
 
-In Snowsight, navigate to **Data > Databases > MARKETING_AI_BI > DEMO_DATA > Dynamic Tables**.
+Run `sql/03_dynamic_tables/01_dynamic_tables.sql` to create 6 dynamic tables in `MARKETING_ANALYTICS`.
+
+### 2.3 Explore Dynamic Table Lineage
+
+In Snowsight, navigate to **Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables**.
 
 Click on `DT_CAMPAIGN_METRICS` and explore the **Lineage** tab. Notice how it joins CAMPAIGNS, MARKETING_SPEND, and ORDERS automatically.
 
 Try a query:
 ```sql
 SELECT campaign_name, channel, sub_channel, total_spend, campaign_revenue, roas
-FROM DT_CAMPAIGN_METRICS
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS
 ORDER BY roas DESC NULLS LAST
 LIMIT 10;
 ```
@@ -154,7 +162,7 @@ This trains two FORECAST models:
 Explore results:
 ```sql
 SELECT series, MIN(ts) AS forecast_start, MAX(ts) AS forecast_end, COUNT(*) AS points
-FROM FORECAST_RESULTS
+FROM MARKETING_AI_BI.MARKETING_RAW.FORECAST_RESULTS
 GROUP BY series;
 ```
 
@@ -170,7 +178,7 @@ This trains three ANOMALY_DETECTION models and should surface the seeded anomali
 Explore anomalies:
 ```sql
 SELECT series, ts, y, forecast, is_anomaly, percentile
-FROM ANOMALY_DETECTION_RESULTS
+FROM MARKETING_AI_BI.MARKETING_RAW.ANOMALY_DETECTION_RESULTS
 WHERE is_anomaly = TRUE
 ORDER BY ts;
 ```
@@ -194,11 +202,11 @@ This applies 5 AI functions and materializes results:
 Explore:
 ```sql
 SELECT channel, ROUND(AVG(sentiment_score), 3) AS avg_sentiment
-FROM AI_SENTIMENT_RESULTS
+FROM MARKETING_AI_BI.MARKETING_RAW.AI_SENTIMENT_RESULTS
 GROUP BY channel;
 
 SELECT performance_tier, COUNT(*) AS campaign_count
-FROM AI_CLASSIFY_RESULTS
+FROM MARKETING_AI_BI.MARKETING_RAW.AI_CLASSIFY_RESULTS
 GROUP BY performance_tier;
 ```
 
@@ -237,13 +245,13 @@ If you need a working app quickly:
 ```sql
 USE ROLE MARKETING_LAB_ROLE;
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_RAW;
 
 PUT file:///path/to/streamlit/streamlit_app.py @STREAMLIT_STAGE/streamlit/ AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
 PUT file:///path/to/streamlit/environment.yml @STREAMLIT_STAGE/streamlit/ AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
 
-CREATE STREAMLIT MARKETING_AI_BI.DEMO_DATA.SUMMIT_GEAR_DASHBOARD
-  ROOT_LOCATION = '@MARKETING_AI_BI.DEMO_DATA.STREAMLIT_STAGE/streamlit'
+CREATE STREAMLIT MARKETING_AI_BI.MARKETING_RAW.SUMMIT_GEAR_DASHBOARD
+  ROOT_LOCATION = '@MARKETING_AI_BI.MARKETING_RAW.STREAMLIT_STAGE/streamlit'
   MAIN_FILE = 'streamlit_app.py'
   QUERY_WAREHOUSE = 'COMPUTE_WH';
 ```
@@ -276,7 +284,6 @@ SELECT SNOWFLAKE.CORTEX.AGENT(
 When finished, clean up all resources:
 
 ```sql
--- Run teardown_all.sql as ACCOUNTADMIN
 USE ROLE ACCOUNTADMIN;
 DROP DATABASE IF EXISTS MARKETING_AI_BI;
 DROP ROLE IF EXISTS MARKETING_LAB_ROLE;

@@ -7,7 +7,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA DEMO_DATA;
+USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 CREATE OR REPLACE AGENT SUMMIT_GEAR_AGENT
@@ -22,7 +22,7 @@ CREATE OR REPLACE AGENT SUMMIT_GEAR_AGENT
 
   tool_resources:
     MarketingAnalyst:
-      semantic_view: "MARKETING_AI_BI.DEMO_DATA.SV_SUMMIT_GEAR_MARKETING"
+      semantic_view: "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_MARKETING"
 
   instructions:
     response: "You are a marketing analytics assistant for Summit Gear Co., an outdoor gear brand. Answer questions about campaign performance, revenue trends, channel metrics, and partner data. Be concise and data-driven."

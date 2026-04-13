@@ -11,4 +11,4 @@ On the first page, show:
 - A time series line chart showing daily revenue with separate lines for DTC and wholesale channels. Let the user pick a date range.
 - A horizontal bar chart showing revenue by product category.
 
-Query data from MARKETING_AI_BI.DEMO_DATA. The main tables are ORDERS (with columns: order_id, customer_id, order_date, channel, product_category, quantity, revenue, wholesale_partner_id) and MARKETING_SPEND (campaign_id, spend_date, channel, amount, impressions, clicks, conversions). Also use the dynamic table DT_DAILY_REVENUE for pre-aggregated daily revenue by channel and DT_CAMPAIGN_METRICS for campaign-level KPIs.
+Query data from MARKETING_AI_BI.MARKETING_RAW. The main tables are ORDERS (with columns: order_id, customer_id, order_date, channel, product_category, quantity, revenue, wholesale_partner_id) and MARKETING_SPEND (campaign_id, spend_date, channel, amount, impressions, clicks, conversions). Also use the dynamic table MARKETING_AI_BI.MARKETING_ANALYTICS.DT_DAILY_REVENUE for pre-aggregated daily revenue by channel and MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS for campaign-level KPIs.

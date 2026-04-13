@@ -8,7 +8,8 @@ st.set_page_config(page_title="Summit Gear Co. Marketing Dashboard", layout="wid
 
 session = get_active_session()
 
-DB_SCHEMA = "MARKETING_AI_BI.DEMO_DATA"
+RAW_SCHEMA = "MARKETING_AI_BI.MARKETING_RAW"
+ANALYTICS_SCHEMA = "MARKETING_AI_BI.MARKETING_ANALYTICS"
 
 
 def run_query(sql):
@@ -26,7 +27,7 @@ def page_kpi_overview():
             SUM(CASE WHEN channel='wholesale' THEN revenue ELSE 0 END) AS wholesale_revenue,
             COUNT(*) AS total_orders,
             ROUND(AVG(revenue),2) AS avg_order_value
-        FROM {DB_SCHEMA}.ORDERS
+        FROM {RAW_SCHEMA}.ORDERS
     """)
 
     prev_orders = run_query(f"""
@@ -36,12 +37,12 @@ def page_kpi_overview():
             SUM(CASE WHEN channel='wholesale' THEN revenue ELSE 0 END) AS wholesale_revenue,
             COUNT(*) AS total_orders,
             ROUND(AVG(revenue),2) AS avg_order_value
-        FROM {DB_SCHEMA}.ORDERS
+        FROM {RAW_SCHEMA}.ORDERS
         WHERE order_date < DATE_TRUNC('MONTH', CURRENT_DATE())
           AND order_date >= DATEADD(MONTH, -1, DATE_TRUNC('MONTH', CURRENT_DATE()))
     """)
 
-    spend = run_query(f"SELECT SUM(amount) AS total_spend FROM {DB_SCHEMA}.MARKETING_SPEND")
+    spend = run_query(f"SELECT SUM(amount) AS total_spend FROM {RAW_SCHEMA}.MARKETING_SPEND")
     roas_val = round(orders["TOTAL_REVENUE"].iloc[0] / max(spend["TOTAL_SPEND"].iloc[0], 1), 2)
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -56,7 +57,7 @@ def page_kpi_overview():
 
     daily = run_query(f"""
         SELECT order_date, channel, total_revenue
-        FROM {DB_SCHEMA}.DT_DAILY_REVENUE
+        FROM {ANALYTICS_SCHEMA}.DT_DAILY_REVENUE
         ORDER BY order_date
     """)
 
@@ -75,7 +76,7 @@ def page_kpi_overview():
     st.subheader("Revenue by Product Category")
     cat = run_query(f"""
         SELECT product_category, SUM(revenue) AS revenue
-        FROM {DB_SCHEMA}.ORDERS
+        FROM {RAW_SCHEMA}.ORDERS
         GROUP BY product_category ORDER BY revenue DESC
     """)
     fig2 = px.bar(cat, x="REVENUE", y="PRODUCT_CATEGORY", orientation="h", title="Revenue by Category")
@@ -89,7 +90,7 @@ def page_channel_deep_dive():
     st.subheader("DTC: Spend vs Conversions by Sub-Channel")
     dtc = run_query(f"""
         SELECT campaign_name, sub_channel, total_spend, total_conversions, cpa, roas
-        FROM {DB_SCHEMA}.DT_CAMPAIGN_METRICS
+        FROM {ANALYTICS_SCHEMA}.DT_CAMPAIGN_METRICS
         WHERE channel = 'DTC' AND total_spend > 0
     """)
     sub_agg = dtc.groupby("SUB_CHANNEL").agg(
@@ -107,7 +108,7 @@ def page_channel_deep_dive():
     st.subheader("Wholesale: Partner Sell-Through Rate (Top 15)")
     partners = run_query(f"""
         SELECT partner_name, avg_sell_through_rate, total_revenue, tier
-        FROM {DB_SCHEMA}.DT_PARTNER_PERFORMANCE
+        FROM {ANALYTICS_SCHEMA}.DT_PARTNER_PERFORMANCE
         ORDER BY avg_sell_through_rate DESC LIMIT 15
     """)
     fig2 = px.bar(partners, x="AVG_SELL_THROUGH_RATE", y="PARTNER_NAME", color="TIER",
@@ -117,7 +118,7 @@ def page_channel_deep_dive():
     st.subheader("Wholesale Trade Promo Performance")
     trade = run_query(f"""
         SELECT campaign_name, total_spend, campaign_revenue, roas
-        FROM {DB_SCHEMA}.DT_CAMPAIGN_METRICS
+        FROM {ANALYTICS_SCHEMA}.DT_CAMPAIGN_METRICS
         WHERE sub_channel = 'trade_promo'
         ORDER BY roas DESC NULLS LAST
     """)
@@ -135,7 +136,7 @@ def page_forecasting_anomalies():
 
     forecast = run_query(f"""
         SELECT ts, forecast, lower_bound, upper_bound
-        FROM {DB_SCHEMA}.FORECAST_RESULTS
+        FROM {RAW_SCHEMA}.FORECAST_RESULTS
         WHERE series = '{forecast_series}'
         ORDER BY ts
     """)
@@ -143,12 +144,12 @@ def page_forecasting_anomalies():
     if forecast_series == "Total":
         actuals = run_query(f"""
             SELECT order_date AS ts, SUM(total_revenue) AS actual
-            FROM {DB_SCHEMA}.DT_DAILY_REVENUE GROUP BY order_date ORDER BY order_date
+            FROM {ANALYTICS_SCHEMA}.DT_DAILY_REVENUE GROUP BY order_date ORDER BY order_date
         """)
     else:
         actuals = run_query(f"""
             SELECT order_date AS ts, total_revenue AS actual
-            FROM {DB_SCHEMA}.DT_DAILY_REVENUE
+            FROM {ANALYTICS_SCHEMA}.DT_DAILY_REVENUE
             WHERE channel = '{forecast_series}' ORDER BY order_date
         """)
 
@@ -163,7 +164,7 @@ def page_forecasting_anomalies():
     st.plotly_chart(fig, use_container_width=True)
 
     try:
-        fi = run_query(f"SELECT * FROM {DB_SCHEMA}.FORECAST_FEATURE_IMPORTANCE")
+        fi = run_query(f"SELECT * FROM {RAW_SCHEMA}.FORECAST_FEATURE_IMPORTANCE")
         if not fi.empty:
             st.subheader("Feature Importance")
             rank_col = [c for c in fi.columns if "RANK" in c.upper() or "IMPORTANCE" in c.upper()]
@@ -181,7 +182,7 @@ def page_forecasting_anomalies():
 
     anomalies = run_query(f"""
         SELECT ts, y, forecast, lower_bound, upper_bound, is_anomaly, percentile
-        FROM {DB_SCHEMA}.ANOMALY_DETECTION_RESULTS
+        FROM {RAW_SCHEMA}.ANOMALY_DETECTION_RESULTS
         WHERE series = '{anomaly_series}'
         ORDER BY ts
     """)
@@ -205,14 +206,14 @@ def page_ai_insights():
 
     st.subheader("Sentiment Distribution: DTC vs Wholesale")
     sentiment = run_query(f"""
-        SELECT channel, sentiment_score FROM {DB_SCHEMA}.AI_SENTIMENT_RESULTS
+        SELECT channel, sentiment_score FROM {RAW_SCHEMA}.AI_SENTIMENT_RESULTS
     """)
     fig = px.histogram(sentiment, x="SENTIMENT_SCORE", color="CHANNEL", barmode="overlay",
                        nbins=30, title="Review Sentiment Distribution")
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Theme Summaries by Channel")
-    themes = run_query(f"SELECT channel, themes FROM {DB_SCHEMA}.AI_AGG_RESULTS")
+    themes = run_query(f"SELECT channel, themes FROM {RAW_SCHEMA}.AI_AGG_RESULTS")
     col1, col2 = st.columns(2)
     for _, row in themes.iterrows():
         target = col1 if "dtc" in row["CHANNEL"].lower() else col2
@@ -223,7 +224,7 @@ def page_ai_insights():
     st.subheader("Campaign Performance Tiers")
     classify = run_query(f"""
         SELECT performance_tier, COUNT(*) AS count
-        FROM {DB_SCHEMA}.AI_CLASSIFY_RESULTS
+        FROM {RAW_SCHEMA}.AI_CLASSIFY_RESULTS
         GROUP BY performance_tier
     """)
     fig2 = px.pie(classify, values="COUNT", names="PERFORMANCE_TIER", title="Campaign Tiers", hole=0.4)
@@ -231,7 +232,7 @@ def page_ai_insights():
 
     st.subheader("AI-Extracted Review Details")
     with st.expander("Show AI_EXTRACT Results"):
-        extract = run_query(f"SELECT * FROM {DB_SCHEMA}.AI_EXTRACT_RESULTS LIMIT 50")
+        extract = run_query(f"SELECT * FROM {RAW_SCHEMA}.AI_EXTRACT_RESULTS LIMIT 50")
         st.dataframe(extract, use_container_width=True)
 
 
@@ -261,7 +262,7 @@ def page_cortex_agent():
             try:
                 result = session.sql(f"""
                     SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
-                        'MARKETING_AI_BI.DEMO_DATA.SUMMIT_GEAR_AGENT',
+                        'MARKETING_AI_BI.MARKETING_ANALYTICS.SUMMIT_GEAR_AGENT',
                         '{question.replace("'", "''")}'
                     ) AS response
                 """).to_pandas()
