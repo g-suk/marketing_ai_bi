@@ -18,7 +18,7 @@ CREATE OR REPLACE API INTEGRATION github_api_integration
 
 CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO
   API_INTEGRATION = github_api_integration
-  ORIGIN = 'https://github.com/g-suk/marketing-data-ai-bi.git';
+  ORIGIN = 'https://github.com/g-suk/marketing_ai_bi.git';
 ```
 
 2. **Open a Snowsight SQL Worksheet** and run:

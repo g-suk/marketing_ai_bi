@@ -41,7 +41,7 @@ CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.DEMO_DATA;
 ```sql
 CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.DEMO_DATA.MARKETING_LAB_REPO
   API_INTEGRATION = github_api_integration
-  ORIGIN = 'https://github.com/g-suk/marketing-data-ai-bi.git';
+  ORIGIN = 'https://github.com/g-suk/marketing_ai_bi.git';
 ```
 
 ### 0.4 Fetch and Browse
