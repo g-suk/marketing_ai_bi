@@ -9,11 +9,11 @@
   NOTE: The database and MARKETING_RAW schema should already exist
   (created during Git integration setup -- see README).
 
-  Tables: WHOLESALE_PARTNERS (30), CAMPAIGNS (60), CUSTOMERS (8000),
-          ORDERS (25000), MARKETING_SPEND (~4000), PRODUCT_REVIEWS (1500)
+  Tables: WHOLESALE_PARTNERS (30), CAMPAIGNS (70), CUSTOMERS (8000),
+          ORDERS (29000), MARKETING_SPEND (~5000), PRODUCT_REVIEWS (1500)
 
-  Date range: 2024-07-01 to 2025-12-31 (18 months)
-  Seeded anomalies: Nov 15 influencer overspend, Feb 10 site outage, Sep 20 wholesale surge
+  Date range: 2024-07-01 to 2026-03-31 (21 months)
+  Seeded anomalies: Nov 15 influencer overspend, Feb 10 site outage, Sep 20 wholesale surge, Mar 5 flash sale spike
   Seasonal patterns: Q4 holiday, spring launch, winter sports, summer lull
 =============================================================================*/
 
@@ -41,6 +41,7 @@ GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE MARKETING_LAB_ROLE;
 -- GRANT IMPORTED PRIVILEGES ON DATABASE FROSTBYTE_WEATHERSOURCE    TO ROLE MARKETING_LAB_ROLE;
 
 GRANT ROLE MARKETING_LAB_ROLE TO USER IDENTIFIER($MY_USER);
+ALTER USER IDENTIFIER($MY_USER) SET DEFAULT_ROLE = MARKETING_LAB_ROLE;
 
 USE ROLE MARKETING_LAB_ROLE;
 USE DATABASE MARKETING_AI_BI;
@@ -123,6 +124,8 @@ INSERT INTO CAMPAIGNS VALUES
 (8,  'Earth Day Sustainability Email',   'DTC', 'email',      '2025-04-15', '2025-04-30', 6000,  300),
 (9,  'Summer Sale Announcement Email',   'DTC', 'email',      '2025-06-01', '2025-06-30', 9500,  470),
 (10, 'Fall Preview Loyalty Email',       'DTC', 'email',      '2025-09-01', '2025-09-30', 8000,  400),
+(61, 'Winter Clearance Email Blast',      'DTC', 'email',      '2026-01-05', '2026-01-31', 9000,  450),
+(62, 'Spring Preview Email',              'DTC', 'email',      '2026-02-15', '2026-03-15', 8500,  420),
 -- DTC: Social (10)
 (11, 'Summer Vibes Social Campaign',     'DTC', 'social',     '2024-07-01', '2024-08-31', 18000, 600),
 (12, 'Autumn Adventure Social',          'DTC', 'social',     '2024-09-15', '2024-10-31', 20000, 700),
@@ -134,6 +137,8 @@ INSERT INTO CAMPAIGNS VALUES
 (18, 'Back to Trail Social',             'DTC', 'social',     '2025-08-01', '2025-08-31', 14000, 480),
 (19, 'Labor Day Blowout Social',         'DTC', 'social',     '2025-09-01', '2025-09-07', 8000,  350),
 (20, 'Holiday Countdown Social',         'DTC', 'social',     '2025-11-01', '2025-12-31', 30000, 1100),
+(63, 'New Year New Trails Social',        'DTC', 'social',     '2026-01-01', '2026-02-28', 20000, 700),
+(64, 'Spring Thaw Social Push',           'DTC', 'social',     '2026-03-01', '2026-03-31', 18000, 620),
 -- DTC: Search (10)
 (21, 'Camping Gear Search Campaign',     'DTC', 'search',     '2024-07-01', '2024-09-30', 25000, 900),
 (22, 'Winter Boots Search',              'DTC', 'search',     '2024-10-01', '2024-12-31', 30000, 1100),
@@ -145,6 +150,7 @@ INSERT INTO CAMPAIGNS VALUES
 (28, 'Outerwear Search - Fall',          'DTC', 'search',     '2025-09-01', '2025-11-30', 20000, 750),
 (29, 'Gift Ideas Search',                'DTC', 'search',     '2025-11-15', '2025-12-25', 16000, 700),
 (30, 'Clearance Sale Search',            'DTC', 'search',     '2025-07-01', '2025-07-31', 10000, 500),
+(65, 'Winter Gear Search - Q1 2026',      'DTC', 'search',     '2026-01-01', '2026-03-31', 26000, 900),
 -- DTC: Influencer (10)
 (31, 'Trail Runner Collab - Jake Marsh', 'DTC', 'influencer', '2024-08-01', '2024-08-31', 12000, 300),
 (32, 'Mountain Vlogger Partnership',     'DTC', 'influencer', '2024-10-01', '2024-11-30', 20000, 500),
@@ -156,6 +162,7 @@ INSERT INTO CAMPAIGNS VALUES
 (38, 'Holiday Gift Unboxing',            'DTC', 'influencer', '2025-11-15', '2025-12-25', 25000, 600),
 (39, 'Gear Review Partnership - Q3',     'DTC', 'influencer', '2025-07-01', '2025-09-30', 16000, 400),
 (40, 'Ultramarathon Sponsorship',        'DTC', 'influencer', '2025-05-01', '2025-05-31', 8000,  200),
+(66, 'Winter Expedition Creator Series',  'DTC', 'influencer', '2026-01-15', '2026-03-15', 22000, 500),
 -- Wholesale: Trade Promo (10)
 (41, 'Q3 Trade Show Promo',              'wholesale', 'trade_promo',      '2024-07-15', '2024-09-15', 40000, 150),
 (42, 'Holiday Stocking Program',         'wholesale', 'trade_promo',      '2024-10-01', '2024-11-30', 60000, 250),
@@ -164,6 +171,7 @@ INSERT INTO CAMPAIGNS VALUES
 (45, 'Summer Catalog Promo',             'wholesale', 'trade_promo',      '2025-04-01', '2025-06-30', 50000, 200),
 (46, 'Back-to-School Retail Push',       'wholesale', 'trade_promo',      '2025-08-01', '2025-09-15', 35000, 140),
 (47, 'Q4 Holiday Trade Incentive',       'wholesale', 'trade_promo',      '2025-10-01', '2025-12-15', 70000, 280),
+(67, 'Q1 2026 Winter Buy-In',             'wholesale', 'trade_promo',      '2026-01-01', '2026-03-31', 55000, 220),
 -- Wholesale: Co-op Advertising (7)
 (48, 'REI Co-op Ad Partnership',         'wholesale', 'co_op_ad',         '2024-09-01', '2024-12-31', 30000, 120),
 (49, 'Dicks Sporting Goods Co-op',       'wholesale', 'co_op_ad',         '2025-01-01', '2025-04-30', 28000, 110),
@@ -172,13 +180,16 @@ INSERT INTO CAMPAIGNS VALUES
 (52, 'Nordstrom Co-op Holiday',          'wholesale', 'co_op_ad',         '2025-10-01', '2025-12-31', 32000, 130),
 (53, 'Backcountry.com Co-op',            'wholesale', 'co_op_ad',         '2025-06-01', '2025-09-30', 20000, 80),
 (54, 'Moosejaw Co-op Winter',            'wholesale', 'co_op_ad',         '2024-11-01', '2025-02-28', 18000, 70),
+(68, 'REI Co-op Winter 2026',             'wholesale', 'co_op_ad',         '2026-01-01', '2026-03-31', 28000, 110),
 -- Wholesale: Distributor Events (6)
 (55, 'Outdoor Retailer Show - Summer',   'wholesale', 'distributor_event', '2024-08-10', '2024-08-15', 15000, 60),
 (56, 'Outdoor Retailer Show - Winter',   'wholesale', 'distributor_event', '2025-01-20', '2025-01-25', 15000, 60),
 (57, 'Regional Dealer Summit - East',    'wholesale', 'distributor_event', '2025-03-10', '2025-03-12', 10000, 40),
 (58, 'Regional Dealer Summit - West',    'wholesale', 'distributor_event', '2025-04-14', '2025-04-16', 10000, 40),
 (59, 'Annual Buyer Conference',          'wholesale', 'distributor_event', '2025-06-15', '2025-06-18', 20000, 80),
-(60, 'Holiday Preview Showcase',         'wholesale', 'distributor_event', '2025-09-08', '2025-09-10', 12000, 50);
+(60, 'Holiday Preview Showcase',         'wholesale', 'distributor_event', '2025-09-08', '2025-09-10', 12000, 50),
+(69, 'Outdoor Retailer Show - Winter 26', 'wholesale', 'distributor_event', '2026-01-22', '2026-01-27', 16000, 65),
+(70, 'Spring Dealer Summit 2026',         'wholesale', 'distributor_event', '2026-03-09', '2026-03-11', 12000, 50);
 
 ----------------------------------------------------------------------
 -- 3. CUSTOMERS (8,000 rows) -- generated via Snowflake Scripting
@@ -245,7 +256,7 @@ SELECT
          WHEN MOD(ABS(HASH(SEQ4() * 17)), 10) < 8 THEN 'wholesale'
          ELSE 'both'
     END AS channel_preference,
-    DATEADD(DAY, -MOD(ABS(HASH(SEQ4() * 23)), 1095), '2025-12-31')::DATE AS signup_date,
+    DATEADD(DAY, -MOD(ABS(HASH(SEQ4() * 23)), 1095), '2026-03-31')::DATE AS signup_date,
     ROUND(50 + UNIFORM(0::FLOAT, 2950::FLOAT, RANDOM(42)), 2) AS lifetime_value
 FROM TABLE(GENERATOR(ROWCOUNT => 8000));
 
@@ -268,8 +279,8 @@ CREATE OR REPLACE TABLE ORDERS (
 INSERT INTO ORDERS
 WITH date_spine AS (
     SELECT DATEADD(DAY, SEQ4(), '2024-07-01')::DATE AS d
-    FROM TABLE(GENERATOR(ROWCOUNT => 549))
-    WHERE DATEADD(DAY, SEQ4(), '2024-07-01') <= '2025-12-31'
+    FROM TABLE(GENERATOR(ROWCOUNT => 640))
+    WHERE DATEADD(DAY, SEQ4(), '2024-07-01') <= '2026-03-31'
 ),
 base_orders AS (
     SELECT
@@ -347,16 +358,17 @@ SELECT
           END
         * CASE
             WHEN channel = 'wholesale' AND order_date BETWEEN '2025-09-15' AND '2025-09-26' THEN 5.0
+            WHEN channel = 'DTC' AND order_date BETWEEN '2026-03-03' AND '2026-03-08' THEN 3.5
             ELSE 1.0
           END
     , 2) AS revenue,
     CASE WHEN channel = 'wholesale' THEN 1 + MOD(ABS(HASH(order_id * 31)), 30) ELSE NULL END AS wholesale_partner_id
 FROM base_orders
 ORDER BY RANDOM(999)
-LIMIT 25000;
+LIMIT 29000;
 
 ----------------------------------------------------------------------
--- 5. MARKETING_SPEND (~8,000 rows) -- daily spend with anomalies
+-- 5. MARKETING_SPEND (~5,000+ rows) -- daily spend with anomalies
 ----------------------------------------------------------------------
 CREATE OR REPLACE TABLE MARKETING_SPEND (
     spend_id    INT,
@@ -373,8 +385,8 @@ CREATE OR REPLACE TABLE MARKETING_SPEND (
 INSERT INTO MARKETING_SPEND
 WITH date_spine AS (
     SELECT DATEADD(DAY, SEQ4(), '2024-07-01')::DATE AS d
-    FROM TABLE(GENERATOR(ROWCOUNT => 549))
-    WHERE DATEADD(DAY, SEQ4(), '2024-07-01') <= '2025-12-31'
+    FROM TABLE(GENERATOR(ROWCOUNT => 640))
+    WHERE DATEADD(DAY, SEQ4(), '2024-07-01') <= '2026-03-31'
 ),
 campaign_dates AS (
     SELECT
@@ -474,7 +486,7 @@ WITH review_base AS (
             WHEN 3 THEN 'climbing' WHEN 4 THEN 'winter_sports' ELSE 'accessories'
         END AS product_category,
         CASE WHEN UNIFORM(0::FLOAT, 1::FLOAT, RANDOM(700)) < 0.65 THEN 'dtc_website' ELSE 'retail_partner' END AS channel,
-        DATEADD(DAY, MOD(ABS(HASH(SEQ4() * 47)), 549), '2024-07-01')::DATE AS review_date,
+        DATEADD(DAY, MOD(ABS(HASH(SEQ4() * 47)), 640), '2024-07-01')::DATE AS review_date,
         CASE
             WHEN UNIFORM(0::FLOAT, 1::FLOAT, RANDOM(800)) < 0.10 THEN 1
             WHEN UNIFORM(0::FLOAT, 1::FLOAT, RANDOM(801)) < 0.15 THEN 2

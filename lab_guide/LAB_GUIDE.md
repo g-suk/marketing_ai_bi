@@ -131,7 +131,7 @@ This trains two FORECAST models:
 Explore results:
 ```sql
 SELECT series, MIN(ts) AS forecast_start, MAX(ts) AS forecast_end, COUNT(*) AS points
-FROM MARKETING_AI_BI.MARKETING_RAW.FORECAST_RESULTS
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.FORECAST_RESULTS
 GROUP BY series;
 ```
 
@@ -147,7 +147,7 @@ This trains three ANOMALY_DETECTION models and should surface the seeded anomali
 Explore anomalies:
 ```sql
 SELECT series, ts, y, forecast, is_anomaly, percentile
-FROM MARKETING_AI_BI.MARKETING_RAW.ANOMALY_DETECTION_RESULTS
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.ANOMALY_DETECTION_RESULTS
 WHERE is_anomaly = TRUE
 ORDER BY ts;
 ```
@@ -173,11 +173,11 @@ This applies 5 AI functions and materializes results:
 Explore:
 ```sql
 SELECT channel, ROUND(AVG(sentiment_score), 3) AS avg_sentiment
-FROM MARKETING_AI_BI.MARKETING_RAW.AI_SENTIMENT_RESULTS
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.AI_SENTIMENT_RESULTS
 GROUP BY channel;
 
 SELECT performance_tier, COUNT(*) AS campaign_count
-FROM MARKETING_AI_BI.MARKETING_RAW.AI_CLASSIFY_RESULTS
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.AI_CLASSIFY_RESULTS
 GROUP BY performance_tier;
 ```
 

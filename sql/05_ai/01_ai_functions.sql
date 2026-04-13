@@ -14,7 +14,7 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA MARKETING_RAW;
+USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
@@ -29,7 +29,7 @@ SELECT
     product_name,
     rating,
     SNOWFLAKE.CORTEX.SENTIMENT(review_text) AS sentiment_score
-FROM PRODUCT_REVIEWS;
+FROM MARKETING_AI_BI.MARKETING_RAW.PRODUCT_REVIEWS;
 
 ----------------------------------------------------------------------
 -- 2. AI_CLASSIFY -- Campaign performance tiers
@@ -72,7 +72,7 @@ SELECT
         review_text,
         'Would the reviewer recommend this product?'
     ) AS recommendation
-FROM PRODUCT_REVIEWS;
+FROM MARKETING_AI_BI.MARKETING_RAW.PRODUCT_REVIEWS;
 
 ----------------------------------------------------------------------
 -- 4. AI_COMPLETE -- Executive campaign summaries
@@ -103,6 +103,6 @@ FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CAMPAIGN_METRICS cm;
 CREATE OR REPLACE TABLE AI_AGG_RESULTS AS
 SELECT
     channel,
-    AI_SUMMARIZE_AGG(review_text) AS themes AS themes
-FROM PRODUCT_REVIEWS
+    AI_SUMMARIZE_AGG(review_text) AS themes
+FROM MARKETING_AI_BI.MARKETING_RAW.PRODUCT_REVIEWS
 GROUP BY channel;

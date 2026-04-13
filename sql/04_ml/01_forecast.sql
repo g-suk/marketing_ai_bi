@@ -12,16 +12,16 @@
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
-USE SCHEMA MARKETING_RAW;
+USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
--- Prepare training data -- use first 15 months, forecast last 3
+-- Prepare training data -- use first 18 months, forecast last 3
 ----------------------------------------------------------------------
 CREATE OR REPLACE VIEW V_FORECAST_TRAINING AS
 SELECT ds, series, y
 FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_FORECAST_INPUT
-WHERE ds < '2025-10-01';
+WHERE ds < '2026-01-01';
 
 ----------------------------------------------------------------------
 -- 1. Single-series FORECAST: Total daily revenue

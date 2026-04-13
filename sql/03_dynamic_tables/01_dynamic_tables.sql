@@ -157,7 +157,8 @@ SELECT
     CASE WHEN dr.order_date IN (
         '2024-07-04','2024-09-02','2024-11-28','2024-11-29','2024-12-25',
         '2025-01-01','2025-01-20','2025-02-17','2025-05-26','2025-07-04',
-        '2025-09-01','2025-11-27','2025-11-28','2025-12-25'
+        '2025-09-01','2025-11-27','2025-11-28','2025-12-25',
+        '2026-01-01','2026-01-19','2026-02-16'
     ) THEN 1 ELSE 0 END AS is_holiday
 FROM DT_DAILY_REVENUE dr;
 
@@ -181,3 +182,21 @@ SELECT
     END AS conversion_rate_pct
 FROM MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND
 GROUP BY spend_date, channel;
+
+----------------------------------------------------------------------
+-- 7. DT_PRODUCT_REVENUE -- Revenue by product category
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_PRODUCT_REVENUE
+    TARGET_LAG = '1 hour'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    product_category,
+    product_name,
+    channel,
+    COUNT(*)                       AS order_count,
+    SUM(quantity)                   AS total_units,
+    ROUND(SUM(revenue), 2)         AS total_revenue,
+    ROUND(AVG(revenue), 2)         AS avg_order_value
+FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
+GROUP BY product_category, product_name, channel;
