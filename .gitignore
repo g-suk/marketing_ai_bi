@@ -1,0 +1,23 @@
+# SnowWork / AI pair-programming artifacts
+AGENTS.md
+BUILD_PROMPT.md
+PLAN.md
+.snowflake/
+scripts/generate_data.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
