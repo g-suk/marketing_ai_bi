@@ -4,50 +4,37 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ## Quick Start
 
-### Step 1: Create the Database (required before Git integration)
+### Step 1: Create the Database and Git Integration
+
+As ACCOUNTADMIN, open a SQL worksheet and run:
 
 ```sql
 USE ROLE ACCOUNTADMIN;
 
 CREATE OR REPLACE DATABASE MARKETING_AI_BI;
 CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_RAW;
-```
 
-### Step 2: Connect via Git Integration (Recommended)
-
-```sql
 CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/g-suk')
   ENABLED = TRUE;
-
-CREATE OR REPLACE GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO
-  API_INTEGRATION = github_api_integration
-  ORIGIN = 'https://github.com/g-suk/marketing_ai_bi.git';
 ```
 
-### Step 3: Fetch and Run Scripts
+### Step 2: Create a Workspace from Git
 
-```sql
-ALTER GIT REPOSITORY MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO FETCH;
-```
+1. In Snowsight, navigate to **Projects > Workspaces**
+2. Click **+ Create Workspace** (top right)
+3. Select **Create Workspace from Git Repository**
+4. Paste the repository URL: `https://github.com/g-suk/marketing_ai_bi.git`
+5. Select **Public Repository** (no credentials needed)
+6. Choose database `MARKETING_AI_BI` and schema `MARKETING_RAW`
+7. Click **Create**
 
-Then run each step individually from the repo (see lab guide for order):
+You now have a full workspace with all lab SQL files ready to open and run.
 
-```sql
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/01_setup/setup.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/02_data/01_synthetic_data.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/03_dynamic_tables/01_dynamic_tables.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/04_ml/01_forecast.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/04_ml/02_anomaly_detection.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/05_ai/01_ai_functions.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/06_semantic/01_semantic_view.sql;
-EXECUTE IMMEDIATE FROM @MARKETING_AI_BI.MARKETING_RAW.MARKETING_LAB_REPO/branches/main/sql/06_semantic/02_cortex_agent.sql;
-```
+### Step 3: Follow the Lab Guide
 
-### Alternative: Copy/Paste
-
-Open a Snowsight SQL worksheet and run each SQL file in order from the `sql/` folder.
+Open `lab_guide/LAB_GUIDE.md` and work through each part. You'll open each SQL file in the workspace, review what it does, and run it step by step.
 
 ## What You'll Build
 
