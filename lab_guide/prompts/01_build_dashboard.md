@@ -4,7 +4,7 @@ Paste this single prompt into Cortex Code:
 
 ---
 
-Build a Streamlit-in-Snowflake app for "Summit Gear Co." Use `get_active_session()` to connect. Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library. Do NOT use `use_column_width` (deprecated) on `st.sidebar.image()`. Wide layout, sidebar navigation with 5 pages.
+Build a Streamlit-in-Snowflake app for "Summit Gear Co." Use `get_active_session()` to connect. Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library. Do NOT use `use_column_width` (deprecated) on `st.sidebar.image()`. Wide layout, sidebar navigation with 5 pages. Store the `streamlit_app.py` and `environment.yml` in the stage `@MARKETING_AI_BI.MARKETING_ANALYTICS.STREAMLIT_STAGE/streamlit/`. The `environment.yml` should list required packages (streamlit, snowflake-snowpark-python, altair, pandas).
 
 ## How to query data — SEMANTIC_VIEW syntax (CRITICAL)
 
