@@ -1,7 +1,6 @@
 import streamlit as st
 from snowflake.snowpark.context import get_active_session
-import plotly.express as px
-import plotly.graph_objects as go
+import altair as alt
 import pandas as pd
 import json
 import _snowflake
@@ -69,8 +68,13 @@ def page_kpi_overview():
         (daily["ORDER_DATE"].dt.date >= start_date) &
         (daily["ORDER_DATE"].dt.date <= end_date)
     ]
-    fig = px.line(daily_filtered, x="ORDER_DATE", y="TOTAL_REVENUE", color="CHANNEL", title="Daily Revenue")
-    st.plotly_chart(fig, use_container_width=True)
+    chart = alt.Chart(daily_filtered).mark_line().encode(
+        x=alt.X("ORDER_DATE:T", title="Date"),
+        y=alt.Y("TOTAL_REVENUE:Q", title="Revenue"),
+        color="CHANNEL:N",
+        tooltip=["ORDER_DATE:T", "CHANNEL:N", alt.Tooltip("TOTAL_REVENUE:Q", format=",.0f")]
+    ).properties(title="Daily Revenue", height=400)
+    st.altair_chart(chart, use_container_width=True)
 
     st.subheader("Revenue by Product Category")
     cat = run_query(f"""
@@ -80,8 +84,12 @@ def page_kpi_overview():
             FACTS product_revenue.total_revenue
         ) ORDER BY total_revenue DESC
     """)
-    fig2 = px.bar(cat, x="TOTAL_REVENUE", y="PRODUCT_CATEGORY", orientation="h", title="Revenue by Category")
-    st.plotly_chart(fig2, use_container_width=True)
+    chart2 = alt.Chart(cat).mark_bar().encode(
+        x=alt.X("TOTAL_REVENUE:Q", title="Revenue"),
+        y=alt.Y("PRODUCT_CATEGORY:N", sort="-x", title="Category"),
+        tooltip=["PRODUCT_CATEGORY:N", alt.Tooltip("TOTAL_REVENUE:Q", format=",.0f")]
+    ).properties(title="Revenue by Category", height=300)
+    st.altair_chart(chart2, use_container_width=True)
 
 
 def page_channel_deep_dive():
@@ -102,9 +110,17 @@ def page_channel_deep_dive():
         total_conversions=("TOTAL_CONVERSIONS", "sum"),
         avg_roas=("ROAS", "mean")
     ).reset_index()
-    fig = px.scatter(sub_agg, x="total_spend", y="total_conversions", size="avg_roas",
-                     color="SUB_CHANNEL", title="DTC Sub-Channels: Spend vs Conversions (sized by ROAS)")
-    st.plotly_chart(fig, use_container_width=True)
+    chart = alt.Chart(sub_agg).mark_circle().encode(
+        x=alt.X("total_spend:Q", title="Total Spend"),
+        y=alt.Y("total_conversions:Q", title="Total Conversions"),
+        size=alt.Size("avg_roas:Q", title="Avg ROAS"),
+        color="SUB_CHANNEL:N",
+        tooltip=["SUB_CHANNEL:N",
+                 alt.Tooltip("total_spend:Q", format=",.0f"),
+                 alt.Tooltip("total_conversions:Q", format=",.0f"),
+                 alt.Tooltip("avg_roas:Q", format=".2f")]
+    ).properties(title="DTC Sub-Channels: Spend vs Conversions (sized by ROAS)", height=400)
+    st.altair_chart(chart, use_container_width=True)
 
     st.subheader("DTC Campaign Metrics")
     dtc_display = dtc[["CAMPAIGN_NAME", "SUB_CHANNEL", "TOTAL_SPEND", "TOTAL_CONVERSIONS", "TOTAL_REVENUE", "ROAS"]]
@@ -119,9 +135,13 @@ def page_channel_deep_dive():
             WHERE partners.partner_name IS NOT NULL
         ) ORDER BY total_revenue DESC LIMIT 15
     """)
-    fig2 = px.bar(partners, x="TOTAL_REVENUE", y="PARTNER_NAME", color="TIER",
-                  orientation="h", title="Revenue by Partner")
-    st.plotly_chart(fig2, use_container_width=True)
+    chart2 = alt.Chart(partners).mark_bar().encode(
+        x=alt.X("TOTAL_REVENUE:Q", title="Revenue"),
+        y=alt.Y("PARTNER_NAME:N", sort="-x", title="Partner"),
+        color="TIER:N",
+        tooltip=["PARTNER_NAME:N", "TIER:N", alt.Tooltip("TOTAL_REVENUE:Q", format=",.0f")]
+    ).properties(title="Revenue by Partner", height=450)
+    st.altair_chart(chart2, use_container_width=True)
 
     st.subheader("Wholesale Trade Promo Performance")
     trade = run_query(f"""
@@ -134,9 +154,16 @@ def page_channel_deep_dive():
     """)
     trade["ROAS"] = trade["TOTAL_REVENUE"] / trade["TOTAL_SPEND"].replace(0, 1)
     trade = trade.sort_values("ROAS", ascending=False)
-    fig3 = px.bar(trade, x="CAMPAIGN_NAME", y=["TOTAL_SPEND", "TOTAL_REVENUE"],
-                  barmode="group", title="Trade Promo: Spend vs Revenue")
-    st.plotly_chart(fig3, use_container_width=True)
+    trade_melted = trade.melt(id_vars=["CAMPAIGN_NAME"], value_vars=["TOTAL_SPEND", "TOTAL_REVENUE"],
+                              var_name="Metric", value_name="Amount")
+    chart3 = alt.Chart(trade_melted).mark_bar().encode(
+        x=alt.X("CAMPAIGN_NAME:N", sort=None, title="Campaign"),
+        y=alt.Y("Amount:Q", title="Amount"),
+        color="Metric:N",
+        xOffset="Metric:N",
+        tooltip=["CAMPAIGN_NAME:N", "Metric:N", alt.Tooltip("Amount:Q", format=",.0f")]
+    ).properties(title="Trade Promo: Spend vs Revenue", height=400)
+    st.altair_chart(chart3, use_container_width=True)
 
 
 def page_forecasting_anomalies():
@@ -175,18 +202,30 @@ def page_forecasting_anomalies():
         """)
         actuals = actuals.rename(columns={"ORDER_DATE": "TS", "TOTAL_REVENUE": "ACTUAL"})
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=actuals["TS"], y=actuals["ACTUAL"], mode="lines", name="Actual"))
+    actuals["TS"] = pd.to_datetime(actuals["TS"])
+    actual_line = alt.Chart(actuals).mark_line().encode(
+        x=alt.X("TS:T", title="Date"),
+        y=alt.Y("ACTUAL:Q", title="Revenue"),
+        tooltip=["TS:T", alt.Tooltip("ACTUAL:Q", format=",.0f")]
+    ).properties(height=400)
+
+    layers = [actual_line]
     if not forecast.empty:
-        fig.add_trace(go.Scatter(x=forecast["TS"], y=forecast["FORECAST"], mode="lines",
-                                 name="Forecast", line=dict(dash="dash")))
-        fig.add_trace(go.Scatter(
-            x=pd.concat([forecast["TS"], forecast["TS"][::-1]]),
-            y=pd.concat([forecast["UPPER_BOUND"], forecast["LOWER_BOUND"][::-1]]),
-            fill="toself", fillcolor="rgba(68,68,255,0.1)",
-            line=dict(color="rgba(255,255,255,0)"), name="Confidence Interval"))
-    fig.update_layout(title=f"{forecast_series} Revenue Forecast")
-    st.plotly_chart(fig, use_container_width=True)
+        forecast["TS"] = pd.to_datetime(forecast["TS"])
+        forecast_line = alt.Chart(forecast).mark_line(strokeDash=[5, 5], color="orange").encode(
+            x="TS:T",
+            y=alt.Y("FORECAST:Q"),
+            tooltip=["TS:T", alt.Tooltip("FORECAST:Q", format=",.0f")]
+        )
+        band = alt.Chart(forecast).mark_area(opacity=0.15, color="steelblue").encode(
+            x="TS:T",
+            y="LOWER_BOUND:Q",
+            y2="UPPER_BOUND:Q"
+        )
+        layers = [band, actual_line, forecast_line]
+
+    chart = alt.layer(*layers).properties(title=f"{forecast_series} Revenue Forecast")
+    st.altair_chart(chart, use_container_width=True)
 
     try:
         fi = run_query(f"""
@@ -198,13 +237,13 @@ def page_forecasting_anomalies():
         """)
         if not fi.empty:
             st.subheader("Feature Importance")
-            rank_col = [c for c in fi.columns if "RANK" in c.upper() or "IMPORTANCE" in c.upper()]
-            name_col = [c for c in fi.columns if "FEATURE" in c.upper() or "NAME" in c.upper()]
-            if rank_col and name_col:
-                fig_fi = px.bar(fi, x=rank_col[0], y=name_col[0], orientation="h", title="Feature Importance")
-                st.plotly_chart(fig_fi, use_container_width=True)
-            else:
-                st.dataframe(fi)
+            chart_fi = alt.Chart(fi).mark_bar().encode(
+                x=alt.X("SCORE:Q", title="Importance Score"),
+                y=alt.Y("FEATURE_NAME:N", sort="-x", title="Feature"),
+                color="FEATURE_TYPE:N",
+                tooltip=["FEATURE_NAME:N", "FEATURE_TYPE:N", alt.Tooltip("SCORE:Q", format=".4f")]
+            ).properties(height=300)
+            st.altair_chart(chart_fi, use_container_width=True)
     except Exception:
         pass
 
@@ -221,19 +260,30 @@ def page_forecasting_anomalies():
     """)
 
     if not anomalies.empty:
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=anomalies["TS"], y=anomalies["Y"], mode="lines", name="Actual"))
-        fig2.add_trace(go.Scatter(x=anomalies["TS"], y=anomalies["FORECAST"], mode="lines",
-                                  name="Expected", line=dict(dash="dot")))
+        anomalies["TS"] = pd.to_datetime(anomalies["TS"])
+        actual_line = alt.Chart(anomalies).mark_line().encode(
+            x=alt.X("TS:T", title="Date"),
+            y=alt.Y("Y:Q", title="Value"),
+            tooltip=["TS:T", alt.Tooltip("Y:Q", format=",.1f")]
+        )
+        expected_line = alt.Chart(anomalies).mark_line(strokeDash=[4, 4], color="gray").encode(
+            x="TS:T",
+            y="FORECAST:Q"
+        )
         anomaly_pts = anomalies[anomalies["IS_ANOMALY"] == True]
-        fig2.add_trace(go.Scatter(
-            x=anomaly_pts["TS"], y=anomaly_pts["Y"], mode="markers",
-            marker=dict(color="red", size=10, symbol="x"), name="Anomaly",
-            text=anomaly_pts.apply(
-                lambda r: f"Date: {r['TS']}<br>Value: {r['Y']:.1f}<br>Expected: {r['FORECAST']:.1f}", axis=1),
-            hoverinfo="text"))
-        fig2.update_layout(title=f"Anomaly Detection: {anomaly_series}")
-        st.plotly_chart(fig2, use_container_width=True)
+        anomaly_marks = alt.Chart(anomaly_pts).mark_point(
+            color="red", size=120, shape="cross", filled=True
+        ).encode(
+            x="TS:T",
+            y="Y:Q",
+            tooltip=["TS:T",
+                     alt.Tooltip("Y:Q", title="Value", format=",.1f"),
+                     alt.Tooltip("FORECAST:Q", title="Expected", format=",.1f")]
+        )
+        chart = alt.layer(actual_line, expected_line, anomaly_marks).properties(
+            title=f"Anomaly Detection: {anomaly_series}", height=400
+        )
+        st.altair_chart(chart, use_container_width=True)
 
 
 def page_ai_insights():
@@ -247,9 +297,13 @@ def page_ai_insights():
             FACTS sentiment.sentiment_score
         )
     """)
-    fig = px.histogram(sentiment, x="SENTIMENT_SCORE", color="CHANNEL", barmode="overlay",
-                       nbins=30, title="Review Sentiment Distribution")
-    st.plotly_chart(fig, use_container_width=True)
+    chart = alt.Chart(sentiment).mark_bar(opacity=0.7).encode(
+        x=alt.X("SENTIMENT_SCORE:Q", bin=alt.Bin(maxbins=30), title="Sentiment Score"),
+        y=alt.Y("count()", title="Count"),
+        color="CHANNEL:N",
+        tooltip=["CHANNEL:N", "count()"]
+    ).properties(title="Review Sentiment Distribution", height=350)
+    st.altair_chart(chart, use_container_width=True)
 
     st.subheader("Theme Summaries by Channel")
     themes = run_query(f"""
@@ -273,9 +327,12 @@ def page_ai_insights():
             METRICS orders.total_orders
         )
     """)
-    fig2 = px.pie(classify, values="TOTAL_ORDERS", names="PERFORMANCE_TIER",
-                  title="Campaign Tiers", hole=0.4)
-    st.plotly_chart(fig2, use_container_width=True)
+    chart2 = alt.Chart(classify).mark_arc(innerRadius=50).encode(
+        theta="TOTAL_ORDERS:Q",
+        color=alt.Color("PERFORMANCE_TIER:N", title="Tier"),
+        tooltip=["PERFORMANCE_TIER:N", alt.Tooltip("TOTAL_ORDERS:Q", format=",")]
+    ).properties(title="Campaign Tiers", height=350)
+    st.altair_chart(chart2, use_container_width=True)
 
     st.subheader("AI-Extracted Review Details")
     with st.expander("Show AI_EXTRACT Results"):
@@ -564,6 +621,5 @@ pages = {
 }
 
 st.sidebar.title("Summit Gear Co.")
-st.sidebar.image("https://via.placeholder.com/200x80?text=Summit+Gear+Co.", use_column_width=True)
 selection = st.sidebar.radio("Navigate", list(pages.keys()))
 pages[selection]()

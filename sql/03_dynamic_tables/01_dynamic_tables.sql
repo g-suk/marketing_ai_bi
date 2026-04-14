@@ -143,27 +143,28 @@ LEFT JOIN (
 ) o ON c.customer_id = o.customer_id;
 
 ----------------------------------------------------------------------
--- 5. DT_FORECAST_INPUT -- FORECAST training data with exogenous features
+-- 5. DT_FORECAST_INPUT -- Revenue forecast input by product_category x channel
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_FORECAST_INPUT
     TARGET_LAG = 'DOWNSTREAM'
     WAREHOUSE = COMPUTE_WH
 AS
 SELECT
-    dr.order_date AS ds,
-    dr.channel    AS series,
-    dr.total_revenue AS y,
-    CASE WHEN DAYOFWEEK(dr.order_date) IN (0, 6) THEN 1 ELSE 0 END AS is_weekend,
-    CASE WHEN dr.order_date IN (
+    order_date AS ds,
+    product_category || '_' || channel AS series,
+    ROUND(SUM(revenue), 2) AS y,
+    CASE WHEN DAYOFWEEK(order_date) IN (0, 6) THEN 1 ELSE 0 END AS is_weekend,
+    CASE WHEN order_date IN (
         '2024-07-04','2024-09-02','2024-11-28','2024-11-29','2024-12-25',
         '2025-01-01','2025-01-20','2025-02-17','2025-05-26','2025-07-04',
         '2025-09-01','2025-11-27','2025-11-28','2025-12-25',
         '2026-01-01','2026-01-19','2026-02-16'
     ) THEN 1 ELSE 0 END AS is_holiday
-FROM DT_DAILY_REVENUE dr;
+FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
+GROUP BY order_date, product_category, channel;
 
 ----------------------------------------------------------------------
--- 6. DT_SPEND_DAILY -- Daily spend totals for ANOMALY_DETECTION
+-- 6. DT_SPEND_DAILY -- Daily spend by sub_channel for anomaly detection
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_SPEND_DAILY
     TARGET_LAG = 'DOWNSTREAM'
@@ -172,6 +173,7 @@ AS
 SELECT
     spend_date                    AS ds,
     channel,
+    sub_channel,
     ROUND(SUM(amount), 2)         AS total_spend,
     SUM(impressions)              AS total_impressions,
     SUM(clicks)                   AS total_clicks,
@@ -181,7 +183,23 @@ SELECT
          ELSE 0
     END AS conversion_rate_pct
 FROM MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND
-GROUP BY spend_date, channel;
+GROUP BY spend_date, channel, sub_channel;
+
+----------------------------------------------------------------------
+-- 6b. DT_SPEND_FORECAST_INPUT -- Spend forecast input by sub_channel
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_SPEND_FORECAST_INPUT
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    ds,
+    sub_channel AS series,
+    SUM(total_spend) AS y,
+    CASE WHEN DAYOFWEEK(ds) IN (0, 6) THEN 1 ELSE 0 END AS is_weekend
+FROM DT_SPEND_DAILY
+WHERE sub_channel != 'distributor_event'
+GROUP BY ds, sub_channel;
 
 ----------------------------------------------------------------------
 -- 7. DT_PRODUCT_REVENUE -- Revenue by product category

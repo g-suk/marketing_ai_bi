@@ -1,13 +1,14 @@
 /*=============================================================================
   Summit Gear Co. -- Marketing AI+BI Lab
   04_ml/01_forecast.sql
-  
+
   Trains SNOWFLAKE.ML.FORECAST models and materializes results.
-  
+
   Models:
-    1. Single-series: Total daily revenue
-    2. Multi-series: Revenue by channel (DTC vs wholesale)
-  
+    1. Single-series: Total daily revenue (executive overview)
+    2. Multi-series: Revenue by product_category x channel (12 series)
+    3. Multi-series: Marketing spend by sub_channel (6 series, excl distributor_event)
+
   Results stored in: FORECAST_RESULTS, FORECAST_FEATURE_IMPORTANCE
 =============================================================================*/
 
@@ -16,7 +17,19 @@ USE SCHEMA MARKETING_ANALYTICS;
 USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
--- Prepare training data -- use first 18 months, forecast last 3
+-- Result tables
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE FORECAST_RESULTS (
+    model_name VARCHAR(50),
+    series VARCHAR(50),
+    ts TIMESTAMP_NTZ,
+    forecast FLOAT,
+    lower_bound FLOAT,
+    upper_bound FLOAT
+);
+
+----------------------------------------------------------------------
+-- Training / holdout split: train on first 18 months, forecast last 3
 ----------------------------------------------------------------------
 CREATE OR REPLACE VIEW V_FORECAST_TRAINING AS
 SELECT ds, series, y
@@ -37,21 +50,16 @@ CREATE OR REPLACE SNOWFLAKE.ML.FORECAST FORECAST_TOTAL_REVENUE(
     TARGET_COLNAME => 'Y'
 );
 
-CREATE OR REPLACE TABLE FORECAST_RESULTS (
-    series VARCHAR(50), ts TIMESTAMP_NTZ,
-    forecast FLOAT, lower_bound FLOAT, upper_bound FLOAT
-);
-
 INSERT INTO FORECAST_RESULTS
-SELECT 'Total' AS series, ts, forecast, lower_bound, upper_bound
+SELECT 'total_revenue' AS model_name, 'Total' AS series, ts, forecast, lower_bound, upper_bound
 FROM TABLE(FORECAST_TOTAL_REVENUE!FORECAST(
     FORECASTING_PERIODS => 90
 ));
 
 ----------------------------------------------------------------------
--- 2. Multi-series FORECAST: Revenue by channel
+-- 2. Multi-series FORECAST: Revenue by product_category x channel
 ----------------------------------------------------------------------
-CREATE OR REPLACE SNOWFLAKE.ML.FORECAST FORECAST_BY_CHANNEL(
+CREATE OR REPLACE SNOWFLAKE.ML.FORECAST FORECAST_BY_PRODUCT_CHANNEL(
     INPUT_DATA => SYSTEM$REFERENCE('VIEW', 'V_FORECAST_TRAINING'),
     SERIES_COLNAME => 'SERIES',
     TIMESTAMP_COLNAME => 'DS',
@@ -60,17 +68,45 @@ CREATE OR REPLACE SNOWFLAKE.ML.FORECAST FORECAST_BY_CHANNEL(
 
 INSERT INTO FORECAST_RESULTS
 SELECT
+    'product_channel' AS model_name,
     series,
     ts,
     forecast,
     lower_bound,
     upper_bound
-FROM TABLE(FORECAST_BY_CHANNEL!FORECAST(
+FROM TABLE(FORECAST_BY_PRODUCT_CHANNEL!FORECAST(
     FORECASTING_PERIODS => 90
 ));
 
 ----------------------------------------------------------------------
--- Feature importance
+-- 3. Multi-series FORECAST: Marketing spend by sub_channel
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_SPEND_FORECAST_TRAINING AS
+SELECT ds, series, y
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_SPEND_FORECAST_INPUT
+WHERE ds < '2026-01-01';
+
+CREATE OR REPLACE SNOWFLAKE.ML.FORECAST FORECAST_SPEND_BY_SUBCHANNEL(
+    INPUT_DATA => SYSTEM$REFERENCE('VIEW', 'V_SPEND_FORECAST_TRAINING'),
+    SERIES_COLNAME => 'SERIES',
+    TIMESTAMP_COLNAME => 'DS',
+    TARGET_COLNAME => 'Y'
+);
+
+INSERT INTO FORECAST_RESULTS
+SELECT
+    'spend_subchannel' AS model_name,
+    series,
+    ts,
+    forecast,
+    lower_bound,
+    upper_bound
+FROM TABLE(FORECAST_SPEND_BY_SUBCHANNEL!FORECAST(
+    FORECASTING_PERIODS => 90
+));
+
+----------------------------------------------------------------------
+-- Feature importance (from product x channel model)
 ----------------------------------------------------------------------
 CREATE OR REPLACE TABLE FORECAST_FEATURE_IMPORTANCE AS
-SELECT * FROM TABLE(FORECAST_BY_CHANNEL!EXPLAIN_FEATURE_IMPORTANCE());
+SELECT * FROM TABLE(FORECAST_BY_PRODUCT_CHANNEL!EXPLAIN_FEATURE_IMPORTANCE());

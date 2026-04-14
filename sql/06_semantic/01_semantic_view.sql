@@ -133,14 +133,14 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_MARKETING
 CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ML
   TABLES (
     forecasts AS MARKETING_AI_BI.MARKETING_ANALYTICS.FORECAST_RESULTS
-      COMMENT = 'Revenue forecast results by series (Total, DTC, wholesale)',
+      COMMENT = 'Revenue and spend forecast results by model (total_revenue, product_channel, spend_subchannel)',
     anomalies AS MARKETING_AI_BI.MARKETING_ANALYTICS.ANOMALY_DETECTION_RESULTS
-      COMMENT = 'Anomaly detection results for spend, conversion rate, and wholesale orders',
+      COMMENT = 'Anomaly detection results by model (spend_subchannel, dtc_conversion, wholesale_product)',
     feature_importance AS MARKETING_AI_BI.MARKETING_ANALYTICS.FORECAST_FEATURE_IMPORTANCE
-      COMMENT = 'Feature importance scores from the forecast model'
+      COMMENT = 'Feature importance scores from the product x channel forecast model'
   )
   FACTS (
-    forecasts.forecast AS forecasts.forecast COMMENT = 'Forecasted revenue value',
+    forecasts.forecast AS forecasts.forecast COMMENT = 'Forecasted value',
     forecasts.lower_bound AS forecasts.lower_bound COMMENT = 'Lower bound of forecast confidence interval',
     forecasts.upper_bound AS forecasts.upper_bound COMMENT = 'Upper bound of forecast confidence interval',
     anomalies.y AS anomalies.y COMMENT = 'Actual observed value',
@@ -152,9 +152,11 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ML
     feature_importance.rank AS feature_importance.rank COMMENT = 'Feature importance rank'
   )
   DIMENSIONS (
-    forecasts.series AS forecasts.series COMMENT = 'Forecast series: Total, DTC, or wholesale',
+    forecasts.model_name AS forecasts.model_name COMMENT = 'Forecast model: total_revenue, product_channel, or spend_subchannel',
+    forecasts.series AS forecasts.series COMMENT = 'Forecast series: Total, {product_category}_{channel}, or sub_channel name',
     forecasts.ts AS forecasts.ts COMMENT = 'Forecast timestamp',
-    anomalies.series AS anomalies.series COMMENT = 'Anomaly series: Ad Spend, DTC Conversion Rate, or Wholesale Orders',
+    anomalies.model_name AS anomalies.model_name COMMENT = 'Anomaly model: spend_subchannel, dtc_conversion, or wholesale_product',
+    anomalies.series AS anomalies.series COMMENT = 'Anomaly series: sub_channel name, DTC Conversion Rate, or product_category',
     anomalies.ts AS anomalies.ts COMMENT = 'Anomaly detection timestamp',
     anomalies.is_anomaly AS anomalies.is_anomaly COMMENT = 'True if the data point is an anomaly',
     feature_importance.feature_name AS feature_importance.feature_name COMMENT = 'Name of the feature',
