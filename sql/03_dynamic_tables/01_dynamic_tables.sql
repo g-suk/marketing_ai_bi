@@ -2,8 +2,14 @@
   Summit Gear Co. -- Marketing AI+BI Lab
   03_dynamic_tables/01_dynamic_tables.sql
 
-  Creates 6 dynamic tables in the MARKETING_ANALYTICS schema that transform
+  Creates 12 dynamic tables in the MARKETING_ANALYTICS schema that transform
   raw source data from MARKETING_RAW into analytics-ready tables.
+
+  Original (1-7):  Core revenue, campaigns, partners, customers, forecast,
+                   spend, product metrics.
+  Marketplace (8-11): Customer enrichment, geo-targeting, weather-revenue,
+                      and marketing-mix-model daily — all fed by snapshot
+                      tables created in 02_marketplace_enrichment.sql.
 
   Participants can inspect the lineage graph in Snowsight:
   Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables
@@ -107,9 +113,12 @@ GROUP BY wp.partner_id, wp.partner_name, wp.region, wp.tier,
          wp.avg_sell_through_rate, wp.annual_volume;
 
 ----------------------------------------------------------------------
--- 4. DT_CUSTOMER_SEGMENTS -- Enriched customer segments
+-- 4. DT_CUSTOMER_ENRICHED -- Customer profiles with marketplace enrichment
+--    Supersedes the original DT_CUSTOMER_SEGMENTS by adding income,
+--    lifestyle, outdoor interest, and purchase-behavior columns.
+--    Depends on: CUSTOMER_ENRICHMENT_SNAPSHOT (02_marketplace_enrichment.sql)
 ----------------------------------------------------------------------
-CREATE OR REPLACE DYNAMIC TABLE DT_CUSTOMER_SEGMENTS
+CREATE OR REPLACE DYNAMIC TABLE DT_CUSTOMER_ENRICHED
     TARGET_LAG = 'DOWNSTREAM'
     WAREHOUSE = COMPUTE_WH
 AS
@@ -121,6 +130,7 @@ SELECT
     c.gender,
     c.channel_preference,
     c.lifetime_value,
+    c.signup_date,
     CASE
         WHEN c.age BETWEEN 18 AND 24 THEN '18-24'
         WHEN c.age BETWEEN 25 AND 34 THEN '25-34'
@@ -133,11 +143,29 @@ SELECT
         WHEN c.lifetime_value >= 500  THEN 'mid_value'
         ELSE 'low_value'
     END AS value_tier,
+    sms.income_bracket,
+    sms.lifestyle_segment,
+    sms.outdoor_interest,
     o.total_orders,
-    o.total_revenue
+    o.total_revenue,
+    o.first_order_date,
+    o.last_order_date,
+    o.distinct_categories,
+    DATEDIFF('day', c.signup_date, o.last_order_date) AS customer_tenure_days,
+    DATEDIFF('day', o.last_order_date, CURRENT_DATE()) AS days_since_last_order,
+    ROUND(o.total_revenue / NULLIF(o.total_orders, 0), 2) AS avg_order_value,
+    ROUND(o.total_orders / NULLIF(DATEDIFF('month', o.first_order_date, o.last_order_date), 0), 2) AS orders_per_month
 FROM MARKETING_AI_BI.MARKETING_RAW.CUSTOMERS c
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.CUSTOMER_ENRICHMENT_SNAPSHOT sms
+    ON c.zip_code = sms.zip_code
 LEFT JOIN (
-    SELECT customer_id, COUNT(*) AS total_orders, SUM(revenue) AS total_revenue
+    SELECT
+        customer_id,
+        COUNT(*) AS total_orders,
+        ROUND(SUM(revenue), 2) AS total_revenue,
+        MIN(order_date) AS first_order_date,
+        MAX(order_date) AS last_order_date,
+        COUNT(DISTINCT product_category) AS distinct_categories
     FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
     GROUP BY customer_id
 ) o ON c.customer_id = o.customer_id;
@@ -218,3 +246,103 @@ SELECT
     ROUND(AVG(revenue), 2)         AS avg_order_value
 FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS
 GROUP BY product_category, product_name, channel;
+
+----------------------------------------------------------------------
+-- 8. DT_WEATHER_REVENUE -- Daily revenue joined with national weather
+--    Depends on: NATIONAL_WEATHER_SNAPSHOT (02_marketplace_enrichment.sql)
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_WEATHER_REVENUE
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    r.order_date,
+    r.channel,
+    r.order_count,
+    r.total_units,
+    r.total_revenue,
+    r.avg_order_value,
+    w.national_avg_temp_f,
+    w.national_precipitation_in,
+    w.national_snowfall_in,
+    CASE
+        WHEN w.national_avg_temp_f < 32 THEN 'freezing'
+        WHEN w.national_avg_temp_f < 50 THEN 'cold'
+        WHEN w.national_avg_temp_f < 70 THEN 'mild'
+        WHEN w.national_avg_temp_f < 85 THEN 'warm'
+        ELSE 'hot'
+    END AS temp_band,
+    CASE WHEN w.national_precipitation_in > 0.5 THEN TRUE ELSE FALSE END AS rainy_day,
+    CASE WHEN w.national_snowfall_in > 1.0 THEN TRUE ELSE FALSE END AS snow_day
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_DAILY_REVENUE r
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.NATIONAL_WEATHER_SNAPSHOT w
+    ON r.order_date = w.weather_date;
+
+----------------------------------------------------------------------
+-- 9. DT_GEO_TARGETING -- Zip-level customer, revenue, and weather profile
+--    Depends on: CUSTOMER_ENRICHMENT_SNAPSHOT, DAILY_WEATHER_SNAPSHOT
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_GEO_TARGETING
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    c.state,
+    c.zip_code,
+    COUNT(DISTINCT c.customer_id) AS customer_count,
+    ROUND(AVG(c.lifetime_value), 2) AS avg_ltv,
+    ROUND(COALESCE(SUM(o.revenue), 0), 2) AS total_revenue,
+    MODE(sms.income_bracket) AS dominant_income_bracket,
+    MODE(sms.lifestyle_segment) AS dominant_lifestyle,
+    MODE(sms.outdoor_interest) AS dominant_outdoor_interest,
+    ROUND(AVG(w.avg_temp_f), 1) AS recent_avg_temp,
+    ROUND(SUM(w.precipitation_in), 2) AS recent_total_precip,
+    ROUND(SUM(w.snowfall_in), 2) AS recent_total_snowfall
+FROM MARKETING_AI_BI.MARKETING_RAW.CUSTOMERS c
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.CUSTOMER_ENRICHMENT_SNAPSHOT sms
+    ON c.zip_code = sms.zip_code
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.ORDERS o
+    ON c.customer_id = o.customer_id
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.DAILY_WEATHER_SNAPSHOT w
+    ON c.zip_code = w.zip_code
+    AND w.weather_date >= DATEADD('day', -30, CURRENT_DATE())
+GROUP BY c.state, c.zip_code;
+
+----------------------------------------------------------------------
+-- 10. DT_MMM_DAILY -- Marketing mix model daily feature table
+--     Joins spend, revenue, economic indicators, and weather.
+--     Depends on: ECONOMIC_INDICATORS_SNAPSHOT, NATIONAL_WEATHER_SNAPSHOT
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_MMM_DAILY
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    d.ds AS dt,
+    d.channel,
+    d.sub_channel,
+    d.total_spend,
+    d.total_impressions,
+    d.total_clicks,
+    d.total_conversions,
+    d.conversion_rate_pct,
+    rev.daily_revenue,
+    ei.cpi,
+    ei.retail_sales_sporting,
+    ei.consumer_confidence,
+    w.national_avg_temp_f,
+    w.national_precipitation_in,
+    w.national_snowfall_in,
+    DAYOFWEEK(d.ds) AS dow,
+    MONTH(d.ds) AS month_num,
+    CASE WHEN DAYOFWEEK(d.ds) IN (0, 6) THEN 1 ELSE 0 END AS is_weekend
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_SPEND_DAILY d
+LEFT JOIN (
+    SELECT order_date, SUM(total_revenue) AS daily_revenue
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_DAILY_REVENUE
+    GROUP BY order_date
+) rev ON d.ds = rev.order_date
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.ECONOMIC_INDICATORS_SNAPSHOT ei
+    ON DATE_TRUNC('MONTH', d.ds)::DATE = ei.indicator_month
+LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.NATIONAL_WEATHER_SNAPSHOT w
+    ON d.ds = w.weather_date;

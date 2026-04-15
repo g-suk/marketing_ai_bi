@@ -12,6 +12,7 @@ session = get_active_session()
 SV_MARKETING = "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_MARKETING"
 SV_ML = "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_ML"
 SV_REVIEWS = "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_REVIEWS"
+SV_ADVANCED = "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_ADVANCED"
 
 
 def run_query(sql):
@@ -92,78 +93,194 @@ def page_kpi_overview():
     st.altair_chart(chart2, use_container_width=True)
 
 
-def page_channel_deep_dive():
-    st.title("Channel Deep Dive")
+def page_advanced_analytics():
+    st.title("Advanced Analytics")
+    tab1, tab2, tab3 = st.tabs(["Marketing Mix Model", "Geo-Targeting", "CLV & Churn"])
 
-    st.subheader("DTC: Spend vs Conversions by Sub-Channel")
-    dtc = run_query(f"""
-        SELECT * FROM SEMANTIC_VIEW(
-            {SV_MARKETING}
-            DIMENSIONS campaigns.campaign_name, campaigns.sub_channel
-            METRICS orders.total_revenue, spend.total_spend, spend.total_conversions
-            WHERE campaigns.channel = 'DTC'
-        )
-    """)
-    dtc["ROAS"] = dtc["TOTAL_REVENUE"] / dtc["TOTAL_SPEND"].replace(0, 1)
-    sub_agg = dtc.groupby("SUB_CHANNEL").agg(
-        total_spend=("TOTAL_SPEND", "sum"),
-        total_conversions=("TOTAL_CONVERSIONS", "sum"),
-        avg_roas=("ROAS", "mean")
-    ).reset_index()
-    chart = alt.Chart(sub_agg).mark_circle().encode(
-        x=alt.X("total_spend:Q", title="Total Spend"),
-        y=alt.Y("total_conversions:Q", title="Total Conversions"),
-        size=alt.Size("avg_roas:Q", title="Avg ROAS"),
-        color="SUB_CHANNEL:N",
-        tooltip=["SUB_CHANNEL:N",
-                 alt.Tooltip("total_spend:Q", format=",.0f"),
-                 alt.Tooltip("total_conversions:Q", format=",.0f"),
-                 alt.Tooltip("avg_roas:Q", format=".2f")]
-    ).properties(title="DTC Sub-Channels: Spend vs Conversions (sized by ROAS)", height=400)
-    st.altair_chart(chart, use_container_width=True)
+    with tab1:
+        st.subheader("Channel ROI by Quarter")
+        mmm = run_query("""
+            SELECT sub_channel, period, total_spend, attributed_revenue, roi, share_of_spend
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_CHANNEL_CONTRIBUTIONS
+            ORDER BY period, total_spend DESC
+        """)
+        if not mmm.empty:
+            period_sel = st.selectbox("Quarter", sorted(mmm["PERIOD"].unique()), key="mmm_period")
+            mmm_f = mmm[mmm["PERIOD"] == period_sel]
+            chart = alt.Chart(mmm_f).mark_bar().encode(
+                x=alt.X("ATTRIBUTED_REVENUE:Q", title="Attributed Revenue"),
+                y=alt.Y("SUB_CHANNEL:N", sort="-x", title="Channel"),
+                color=alt.Color("ROI:Q", scale=alt.Scale(scheme="redyellowgreen")),
+                tooltip=["SUB_CHANNEL:N",
+                         alt.Tooltip("TOTAL_SPEND:Q", format=",.0f", title="Spend"),
+                         alt.Tooltip("ATTRIBUTED_REVENUE:Q", format=",.0f", title="Attributed Rev"),
+                         alt.Tooltip("ROI:Q", format=".2f"),
+                         alt.Tooltip("SHARE_OF_SPEND:Q", format=".1f", title="Spend Share %")]
+            ).properties(title=f"Channel Attribution — {period_sel}", height=350)
+            st.altair_chart(chart, use_container_width=True)
 
-    st.subheader("DTC Campaign Metrics")
-    dtc_display = dtc[["CAMPAIGN_NAME", "SUB_CHANNEL", "TOTAL_SPEND", "TOTAL_CONVERSIONS", "TOTAL_REVENUE", "ROAS"]]
-    st.dataframe(dtc_display.sort_values("ROAS", ascending=False), use_container_width=True)
+        st.subheader("Weekly Spend vs Attributed Revenue")
+        weekly = run_query("""
+            SELECT week_start, sub_channel, spend, attributed_revenue, efficiency_index
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_WEEKLY_DECOMPOSITION
+            ORDER BY week_start
+        """)
+        if not weekly.empty:
+            channel_sel = st.multiselect("Channels", weekly["SUB_CHANNEL"].unique().tolist(),
+                                         default=weekly["SUB_CHANNEL"].unique().tolist()[:3], key="mmm_channels")
+            wf = weekly[weekly["SUB_CHANNEL"].isin(channel_sel)]
+            spend_line = alt.Chart(wf).mark_line(strokeDash=[4, 4]).encode(
+                x=alt.X("WEEK_START:T", title="Week"),
+                y=alt.Y("SPEND:Q", title="Amount ($)"),
+                color="SUB_CHANNEL:N",
+                strokeDash=alt.value([4, 4]),
+                tooltip=["SUB_CHANNEL:N", "WEEK_START:T", alt.Tooltip("SPEND:Q", format=",.0f")]
+            )
+            rev_line = alt.Chart(wf).mark_line().encode(
+                x="WEEK_START:T",
+                y=alt.Y("ATTRIBUTED_REVENUE:Q"),
+                color="SUB_CHANNEL:N",
+                tooltip=["SUB_CHANNEL:N", "WEEK_START:T", alt.Tooltip("ATTRIBUTED_REVENUE:Q", format=",.0f")]
+            )
+            chart2 = alt.layer(spend_line, rev_line).properties(
+                title="Spend (dashed) vs Attributed Revenue (solid)", height=400
+            )
+            st.altair_chart(chart2, use_container_width=True)
 
-    st.subheader("Wholesale: Partner Revenue (Top 15)")
-    partners = run_query(f"""
-        SELECT * FROM SEMANTIC_VIEW(
-            {SV_MARKETING}
-            DIMENSIONS partners.partner_name, partners.tier
-            METRICS orders.total_revenue
-            WHERE partners.partner_name IS NOT NULL
-        ) ORDER BY total_revenue DESC LIMIT 15
-    """)
-    chart2 = alt.Chart(partners).mark_bar().encode(
-        x=alt.X("TOTAL_REVENUE:Q", title="Revenue"),
-        y=alt.Y("PARTNER_NAME:N", sort="-x", title="Partner"),
-        color="TIER:N",
-        tooltip=["PARTNER_NAME:N", "TIER:N", alt.Tooltip("TOTAL_REVENUE:Q", format=",.0f")]
-    ).properties(title="Revenue by Partner", height=450)
-    st.altair_chart(chart2, use_container_width=True)
+        st.subheader("AI Marketing Mix Insights")
+        insights = run_query("SELECT insight_text FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_AI_INSIGHTS LIMIT 1")
+        if not insights.empty:
+            st.markdown(insights.iloc[0]["INSIGHT_TEXT"])
 
-    st.subheader("Wholesale Trade Promo Performance")
-    trade = run_query(f"""
-        SELECT * FROM SEMANTIC_VIEW(
-            {SV_MARKETING}
-            DIMENSIONS campaigns.campaign_name
-            METRICS orders.total_revenue, spend.total_spend
-            WHERE campaigns.sub_channel = 'trade_promo'
-        )
-    """)
-    trade["ROAS"] = trade["TOTAL_REVENUE"] / trade["TOTAL_SPEND"].replace(0, 1)
-    trade = trade.sort_values("ROAS", ascending=False)
-    trade_melted = trade.melt(id_vars=["CAMPAIGN_NAME"], value_vars=["TOTAL_SPEND", "TOTAL_REVENUE"],
-                              var_name="Metric", value_name="Amount")
-    chart3 = alt.Chart(trade_melted).mark_bar().encode(
-        x=alt.X("CAMPAIGN_NAME:N", sort=None, title="Campaign"),
-        y=alt.Y("Amount:Q", title="Amount"),
-        color="Metric:N",
-        xOffset="Metric:N",
-        tooltip=["CAMPAIGN_NAME:N", "Metric:N", alt.Tooltip("Amount:Q", format=",.0f")]
-    ).properties(title="Trade Promo: Spend vs Revenue", height=400)
-    st.altair_chart(chart3, use_container_width=True)
+    with tab2:
+        st.subheader("Geo-Targeting: State Performance")
+        geo = run_query("""
+            SELECT state, SUM(customer_count) AS customers, ROUND(AVG(avg_ltv), 2) AS avg_ltv,
+                   ROUND(SUM(total_revenue), 0) AS total_revenue, ROUND(AVG(targeting_score), 3) AS avg_score,
+                   MODE(weather_recommended_category) AS top_category, MODE(recommended_channel) AS top_channel
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_TARGETING_PROFILES
+            GROUP BY state ORDER BY total_revenue DESC
+        """)
+        if not geo.empty:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("States Covered", f"{len(geo)}")
+            col2.metric("Avg Targeting Score", f"{geo['AVG_SCORE'].mean():.3f}")
+            col3.metric("Total Geo Revenue", f"${geo['TOTAL_REVENUE'].sum():,.0f}")
+
+            chart3 = alt.Chart(geo.head(20)).mark_bar().encode(
+                x=alt.X("TOTAL_REVENUE:Q", title="Revenue"),
+                y=alt.Y("STATE:N", sort="-x", title="State"),
+                color=alt.Color("AVG_SCORE:Q", scale=alt.Scale(scheme="viridis"), title="Targeting Score"),
+                tooltip=["STATE:N", alt.Tooltip("TOTAL_REVENUE:Q", format=",.0f"),
+                         alt.Tooltip("CUSTOMERS:Q", format=","), alt.Tooltip("AVG_LTV:Q", format=",.2f"),
+                         "TOP_CATEGORY:N", "TOP_CHANNEL:N", alt.Tooltip("AVG_SCORE:Q", format=".3f")]
+            ).properties(title="Top 20 States by Revenue (colored by targeting score)", height=500)
+            st.altair_chart(chart3, use_container_width=True)
+
+        st.subheader("Weather-Triggered Campaigns")
+        triggers = run_query("""
+            SELECT trigger_action, recommended_product_category, COUNT(*) AS zip_count, ROUND(AVG(avg_ltv), 2) AS avg_ltv
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_WEATHER_TRIGGERS
+            WHERE trigger_action != 'NO TRIGGER'
+            GROUP BY trigger_action, recommended_product_category
+            ORDER BY zip_count DESC
+        """)
+        if not triggers.empty:
+            chart4 = alt.Chart(triggers).mark_bar().encode(
+                x=alt.X("ZIP_COUNT:Q", title="Zip Codes Triggered"),
+                y=alt.Y("TRIGGER_ACTION:N", sort="-x", title="Trigger"),
+                color="RECOMMENDED_PRODUCT_CATEGORY:N",
+                tooltip=["TRIGGER_ACTION:N", "RECOMMENDED_PRODUCT_CATEGORY:N",
+                         alt.Tooltip("ZIP_COUNT:Q", format=","), alt.Tooltip("AVG_LTV:Q", format=",.2f")]
+            ).properties(title="Active Weather Triggers", height=300)
+            st.altair_chart(chart4, use_container_width=True)
+        else:
+            st.info("No weather triggers currently active.")
+
+        st.subheader("AI State Recommendations")
+        recs = run_query("""
+            SELECT state, customer_count, avg_ltv, total_revenue, recommendation
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_AI_RECOMMENDATIONS
+            ORDER BY total_revenue DESC LIMIT 10
+        """)
+        if not recs.empty:
+            state_sel = st.selectbox("Select State", recs["STATE"].tolist(), key="geo_state")
+            row = recs[recs["STATE"] == state_sel].iloc[0]
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Customers", f"{row['CUSTOMER_COUNT']:,}")
+            c2.metric("Avg LTV", f"${row['AVG_LTV']:,.2f}")
+            c3.metric("Revenue", f"${row['TOTAL_REVENUE']:,.0f}")
+            st.markdown(row["RECOMMENDATION"])
+
+    with tab3:
+        st.subheader("CLV Risk Distribution")
+        clv = run_query("""
+            SELECT clv_tier, COUNT(*) AS customers, ROUND(AVG(lifetime_value), 2) AS avg_ltv,
+                   ROUND(AVG(churn_risk_score), 2) AS avg_churn_risk, ROUND(AVG(total_orders), 1) AS avg_orders
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.CLV_RISK_CLASSIFICATION
+            GROUP BY clv_tier ORDER BY customers DESC
+        """)
+        if not clv.empty:
+            total_customers = clv["CUSTOMERS"].sum()
+            at_risk = clv.loc[clv["CLV_TIER"].isin(["At-Risk", "Lapsed"]), "CUSTOMERS"].sum()
+            loyal = clv.loc[clv["CLV_TIER"] == "Loyal High-Value", "CUSTOMERS"].sum()
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total Customers", f"{total_customers:,}")
+            c2.metric("Loyal High-Value", f"{loyal:,}")
+            c3.metric("At-Risk + Lapsed", f"{at_risk:,}")
+            c4.metric("At-Risk %", f"{at_risk / max(total_customers, 1) * 100:.1f}%")
+
+            tier_order = ["Loyal High-Value", "Growth Potential", "New Customer", "At-Risk", "Lapsed"]
+            tier_colors = ["#2ecc71", "#3498db", "#9b59b6", "#e67e22", "#e74c3c"]
+            chart5 = alt.Chart(clv).mark_arc(innerRadius=60).encode(
+                theta="CUSTOMERS:Q",
+                color=alt.Color("CLV_TIER:N", sort=tier_order,
+                                scale=alt.Scale(domain=tier_order, range=tier_colors)),
+                tooltip=["CLV_TIER:N", alt.Tooltip("CUSTOMERS:Q", format=","),
+                         alt.Tooltip("AVG_LTV:Q", format=",.2f"),
+                         alt.Tooltip("AVG_CHURN_RISK:Q", format=".2f"),
+                         alt.Tooltip("AVG_ORDERS:Q", format=".1f")]
+            ).properties(title="Customer CLV Tiers", height=350)
+            st.altair_chart(chart5, use_container_width=True)
+
+            st.dataframe(clv, use_container_width=True)
+
+        st.subheader("Churn Risk by Lifestyle Segment")
+        lifestyle = run_query("""
+            SELECT lifestyle_segment, clv_tier, COUNT(*) AS cnt
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.CLV_RISK_CLASSIFICATION
+            WHERE lifestyle_segment IS NOT NULL
+            GROUP BY lifestyle_segment, clv_tier ORDER BY lifestyle_segment, cnt DESC
+        """)
+        if not lifestyle.empty:
+            chart6 = alt.Chart(lifestyle).mark_bar().encode(
+                x=alt.X("CNT:Q", title="Customers", stack="normalize"),
+                y=alt.Y("LIFESTYLE_SEGMENT:N", title="Lifestyle Segment"),
+                color=alt.Color("CLV_TIER:N", sort=tier_order,
+                                scale=alt.Scale(domain=tier_order, range=tier_colors)),
+                tooltip=["LIFESTYLE_SEGMENT:N", "CLV_TIER:N", alt.Tooltip("CNT:Q", format=",")]
+            ).properties(title="CLV Tier Mix by Lifestyle (Normalized)", height=350)
+            st.altair_chart(chart6, use_container_width=True)
+
+        st.subheader("Weather Impact on Revenue")
+        weather = run_query("""
+            SELECT temp_band, ROUND(AVG(total_revenue), 2) AS avg_revenue, COUNT(*) AS days
+            FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_WEATHER_REVENUE
+            WHERE temp_band IS NOT NULL
+            GROUP BY temp_band ORDER BY avg_revenue DESC
+        """)
+        if not weather.empty:
+            temp_order = ["freezing", "cold", "mild", "warm", "hot"]
+            chart7 = alt.Chart(weather).mark_bar().encode(
+                x=alt.X("TEMP_BAND:N", sort=temp_order, title="Temperature Band"),
+                y=alt.Y("AVG_REVENUE:Q", title="Avg Daily Revenue"),
+                color=alt.Color("TEMP_BAND:N", sort=temp_order,
+                                scale=alt.Scale(domain=temp_order,
+                                                range=["#3498db", "#2980b9", "#27ae60", "#f39c12", "#e74c3c"])),
+                tooltip=["TEMP_BAND:N", alt.Tooltip("AVG_REVENUE:Q", format=",.2f"),
+                         alt.Tooltip("DAYS:Q", format=",")]
+            ).properties(title="Average Revenue by Temperature Band", height=300)
+            st.altair_chart(chart7, use_container_width=True)
 
 
 def page_forecasting_anomalies():
@@ -614,7 +731,7 @@ def page_cortex_agent():
 
 pages = {
     "KPI Overview": page_kpi_overview,
-    "Channel Deep Dive": page_channel_deep_dive,
+    "Advanced Analytics": page_advanced_analytics,
     "Forecasting & Anomalies": page_forecasting_anomalies,
     "AI Insights": page_ai_insights,
     "Marketing Agent": page_cortex_agent

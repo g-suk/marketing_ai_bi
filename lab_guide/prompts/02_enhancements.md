@@ -18,7 +18,7 @@ Once you have the base dashboard running, try pasting any of these follow-up pro
 
 ## Customer Segmentation Drilldown
 
-> Add a new page called "Customer Segments" that queries DT_CUSTOMER_SEGMENTS from MARKETING_AI_BI.MARKETING_ANALYTICS (columns: segment, customer_count, avg_lifetime_value, avg_age, top_state, top_category, avg_orders). Show a bar chart of customer count by segment, a scatter of avg_lifetime_value vs avg_orders colored by segment, and a detail table.
+> Add a new page called "Customer Segments" that queries DT_CUSTOMER_ENRICHED from MARKETING_AI_BI.MARKETING_ANALYTICS (columns: customer_id, state, zip_code, age, age_group, value_tier, income_bracket, lifestyle_segment, outdoor_interest, total_orders, total_revenue, avg_order_value, orders_per_month, days_since_last_order). Show a bar chart of customer count by value_tier, a scatter of avg_order_value vs orders_per_month colored by lifestyle_segment, and a detail table filterable by state and outdoor_interest.
 
 ---
 

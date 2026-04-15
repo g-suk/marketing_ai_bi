@@ -2,10 +2,11 @@
   Summit Gear Co. -- Marketing AI+BI Lab
   06_semantic/01_semantic_view.sql
 
-  Creates three semantic views that collectively cover all dashboard data:
-    1. SV_SUMMIT_GEAR_MARKETING  -- core transactional model + daily/product aggregates + campaign classification
+  Creates four semantic views that collectively cover all dashboard data:
+    1. SV_SUMMIT_GEAR_MARKETING  -- core transactional model + daily/product aggregates + campaign classification + AI summaries
     2. SV_SUMMIT_GEAR_ML         -- forecast and anomaly detection results
     3. SV_SUMMIT_GEAR_REVIEWS    -- AI-powered review analysis
+    4. SV_SUMMIT_GEAR_ADVANCED   -- MMM, geo-targeting, CLV, weather impact
 
   These views back the Cortex Agent for natural language Q&A.
 
@@ -52,7 +53,10 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_MARKETING
       COMMENT = 'Revenue aggregated by product category and channel',
     campaign_tiers AS MARKETING_AI_BI.MARKETING_ANALYTICS.AI_CLASSIFY_RESULTS
       PRIMARY KEY (campaign_id)
-      COMMENT = 'AI-classified campaign performance tiers'
+      COMMENT = 'AI-classified campaign performance tiers',
+    campaign_summaries AS MARKETING_AI_BI.MARKETING_ANALYTICS.AI_COMPLETE_RESULTS
+      PRIMARY KEY (campaign_id)
+      COMMENT = 'AI-generated executive summaries per campaign'
   )
   RELATIONSHIPS (
     orders (campaign_id) REFERENCES campaigns (campaign_id),
@@ -61,7 +65,8 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_MARKETING
     spend (campaign_id) REFERENCES campaigns (campaign_id),
     campaign_metrics (campaign_id) REFERENCES campaigns (campaign_id),
     partner_perf (partner_id) REFERENCES partners (partner_id),
-    campaign_tiers (campaign_id) REFERENCES campaigns (campaign_id)
+    campaign_tiers (campaign_id) REFERENCES campaigns (campaign_id),
+    campaign_summaries (campaign_id) REFERENCES campaigns (campaign_id)
   )
   FACTS (
     orders.revenue AS orders.revenue COMMENT = 'Order revenue in USD',
@@ -114,7 +119,11 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_MARKETING
     campaign_tiers.campaign_name AS campaign_tiers.campaign_name COMMENT = 'Campaign name from classification',
     campaign_tiers.channel AS campaign_tiers.channel COMMENT = 'Campaign channel',
     campaign_tiers.sub_channel AS campaign_tiers.sub_channel COMMENT = 'Campaign sub-channel',
-    campaign_tiers.performance_tier AS campaign_tiers.performance_tier COMMENT = 'AI-assigned tier: high, medium, or low'
+    campaign_tiers.performance_tier AS campaign_tiers.performance_tier COMMENT = 'AI-assigned tier: high, medium, or low',
+    campaign_summaries.campaign_name AS campaign_summaries.campaign_name COMMENT = 'Campaign name for executive summary',
+    campaign_summaries.channel AS campaign_summaries.channel COMMENT = 'Campaign channel',
+    campaign_summaries.sub_channel AS campaign_summaries.sub_channel COMMENT = 'Campaign sub-channel',
+    campaign_summaries.executive_summary AS campaign_summaries.executive_summary COMMENT = 'AI-generated 2-sentence executive summary of campaign performance'
   )
   METRICS (
     orders.total_revenue AS SUM(orders.revenue) COMMENT = 'Sum of order revenue',
@@ -210,3 +219,100 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_REVIEWS
     sentiment.avg_rating AS AVG(sentiment.rating) COMMENT = 'Average star rating'
   )
   COMMENT = 'AI-powered review analysis for Summit Gear Co.';
+
+----------------------------------------------------------------------
+-- 4. SV_SUMMIT_GEAR_ADVANCED
+--    Advanced analytics: MMM, geo-targeting, CLV, weather impact.
+----------------------------------------------------------------------
+CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
+  TABLES (
+    mmm_contributions AS MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_CHANNEL_CONTRIBUTIONS
+      COMMENT = 'Quarterly marketing mix model channel contributions and ROI',
+    mmm_weekly AS MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_WEEKLY_DECOMPOSITION
+      COMMENT = 'Weekly marketing mix decomposition with spend and attributed revenue',
+    mmm_insights AS MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_AI_INSIGHTS
+      COMMENT = 'AI-generated marketing mix model insights',
+    geo_profiles AS MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_TARGETING_PROFILES
+      COMMENT = 'Zip-code level geo-targeting profiles with composite scoring',
+    geo_triggers AS MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_WEATHER_TRIGGERS
+      COMMENT = 'Weather-triggered campaign rules by zip code',
+    geo_recommendations AS MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_AI_RECOMMENDATIONS
+      COMMENT = 'AI-generated per-state targeting recommendations',
+    clv_risk AS MARKETING_AI_BI.MARKETING_ANALYTICS.CLV_RISK_CLASSIFICATION
+      PRIMARY KEY (customer_id)
+      COMMENT = 'Customer lifetime value tiers and churn risk scores',
+    weather_revenue AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_WEATHER_REVENUE
+      COMMENT = 'Daily revenue with weather conditions and temperature bands',
+    customer_enriched AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CUSTOMER_ENRICHED
+      PRIMARY KEY (customer_id)
+      COMMENT = 'Enriched customer profiles with marketplace data, purchase behavior, and demographics'
+  )
+  RELATIONSHIPS (
+    clv_risk (customer_id) REFERENCES customer_enriched (customer_id)
+  )
+  FACTS (
+    mmm_contributions.total_spend AS mmm_contributions.total_spend COMMENT = 'Quarterly channel spend',
+    mmm_contributions.attributed_revenue AS mmm_contributions.attributed_revenue COMMENT = 'Revenue attributed to channel',
+    mmm_contributions.roi AS mmm_contributions.roi COMMENT = 'Channel return on investment',
+    mmm_contributions.share_of_spend AS mmm_contributions.share_of_spend COMMENT = 'Channel share of total spend pct',
+    mmm_contributions.cost_per_conversion AS mmm_contributions.cost_per_conversion COMMENT = 'Cost per conversion for channel',
+    mmm_weekly.spend AS mmm_weekly.spend COMMENT = 'Weekly channel spend',
+    mmm_weekly.attributed_revenue AS mmm_weekly.attributed_revenue COMMENT = 'Weekly attributed revenue',
+    mmm_weekly.incremental_revenue AS mmm_weekly.incremental_revenue COMMENT = 'Weekly incremental (non-organic) revenue',
+    mmm_weekly.efficiency_index AS mmm_weekly.efficiency_index COMMENT = 'Revenue efficiency index for spend',
+    geo_profiles.customer_count AS geo_profiles.customer_count COMMENT = 'Customers in zip code',
+    geo_profiles.avg_ltv AS geo_profiles.avg_ltv COMMENT = 'Average LTV for zip code',
+    geo_profiles.total_revenue AS geo_profiles.total_revenue COMMENT = 'Total revenue for zip code',
+    geo_profiles.targeting_score AS geo_profiles.targeting_score COMMENT = 'Composite targeting score 0-1',
+    clv_risk.lifetime_value AS clv_risk.lifetime_value COMMENT = 'Customer lifetime value',
+    clv_risk.total_orders AS clv_risk.total_orders COMMENT = 'Total orders placed',
+    clv_risk.total_revenue AS clv_risk.total_revenue COMMENT = 'Total revenue from customer',
+    clv_risk.churn_risk_score AS clv_risk.churn_risk_score COMMENT = 'Churn risk score 0-1',
+    clv_risk.days_since_last_order AS clv_risk.days_since_last_order COMMENT = 'Days since most recent order',
+    weather_revenue.total_revenue AS weather_revenue.total_revenue COMMENT = 'Daily revenue',
+    weather_revenue.national_avg_temp_f AS weather_revenue.national_avg_temp_f COMMENT = 'National average temperature F',
+    customer_enriched.lifetime_value AS customer_enriched.lifetime_value COMMENT = 'Customer lifetime value',
+    customer_enriched.avg_order_value AS customer_enriched.avg_order_value COMMENT = 'Average order value',
+    customer_enriched.orders_per_month AS customer_enriched.orders_per_month COMMENT = 'Order frequency per month'
+  )
+  DIMENSIONS (
+    mmm_contributions.sub_channel AS mmm_contributions.sub_channel COMMENT = 'Marketing sub-channel',
+    mmm_contributions.period AS mmm_contributions.period COMMENT = 'Quarter period like Q1_2025',
+    mmm_weekly.week_start AS mmm_weekly.week_start COMMENT = 'Week start date',
+    mmm_weekly.sub_channel AS mmm_weekly.sub_channel COMMENT = 'Marketing sub-channel',
+    geo_profiles.state AS geo_profiles.state COMMENT = 'US state abbreviation',
+    geo_profiles.zip_code AS geo_profiles.zip_code COMMENT = 'ZIP code',
+    geo_profiles.dominant_lifestyle AS geo_profiles.dominant_lifestyle COMMENT = 'Most common lifestyle segment in zip',
+    geo_profiles.dominant_outdoor_interest AS geo_profiles.dominant_outdoor_interest COMMENT = 'Most common outdoor interest in zip',
+    geo_profiles.weather_recommended_category AS geo_profiles.weather_recommended_category COMMENT = 'Product category recommended based on weather',
+    geo_profiles.recommended_channel AS geo_profiles.recommended_channel COMMENT = 'Recommended marketing channel for zip',
+    geo_triggers.trigger_action AS geo_triggers.trigger_action COMMENT = 'Weather-triggered campaign action',
+    geo_triggers.recommended_product_category AS geo_triggers.recommended_product_category COMMENT = 'Product category triggered by weather',
+    geo_recommendations.state AS geo_recommendations.state COMMENT = 'State for AI recommendation',
+    geo_recommendations.recommendation AS geo_recommendations.recommendation COMMENT = 'AI-generated state targeting recommendation',
+    clv_risk.clv_tier AS clv_risk.clv_tier COMMENT = 'CLV tier: Loyal High-Value, Growth Potential, At-Risk, New Customer, or Lapsed',
+    clv_risk.state AS clv_risk.state COMMENT = 'Customer state',
+    clv_risk.age_group AS clv_risk.age_group COMMENT = 'Customer age group',
+    clv_risk.value_tier AS clv_risk.value_tier COMMENT = 'high_value, mid_value, or low_value',
+    clv_risk.lifestyle_segment AS clv_risk.lifestyle_segment COMMENT = 'Customer lifestyle segment from marketplace',
+    clv_risk.outdoor_interest AS clv_risk.outdoor_interest COMMENT = 'Customer outdoor interest from marketplace',
+    weather_revenue.order_date AS weather_revenue.order_date COMMENT = 'Order date',
+    weather_revenue.channel AS weather_revenue.channel COMMENT = 'DTC or wholesale',
+    weather_revenue.temp_band AS weather_revenue.temp_band COMMENT = 'Temperature band: freezing, cold, mild, warm, hot',
+    weather_revenue.rainy_day AS weather_revenue.rainy_day COMMENT = 'Was it a rainy day',
+    weather_revenue.snow_day AS weather_revenue.snow_day COMMENT = 'Was it a snow day',
+    customer_enriched.state AS customer_enriched.state COMMENT = 'Customer state',
+    customer_enriched.age_group AS customer_enriched.age_group COMMENT = 'Customer age group',
+    customer_enriched.value_tier AS customer_enriched.value_tier COMMENT = 'Customer value tier',
+    customer_enriched.lifestyle_segment AS customer_enriched.lifestyle_segment COMMENT = 'Customer lifestyle from marketplace',
+    customer_enriched.outdoor_interest AS customer_enriched.outdoor_interest COMMENT = 'Customer outdoor interest from marketplace'
+  )
+  METRICS (
+    mmm_contributions.avg_roi AS AVG(mmm_contributions.roi) COMMENT = 'Average ROI across channels',
+    mmm_contributions.total_attributed_revenue AS SUM(mmm_contributions.attributed_revenue) COMMENT = 'Sum of attributed revenue',
+    geo_profiles.avg_targeting_score AS AVG(geo_profiles.targeting_score) COMMENT = 'Average targeting score',
+    clv_risk.at_risk_count AS COUNT_IF(clv_risk.churn_risk_score >= 0.7) COMMENT = 'Number of at-risk or lapsed customers',
+    clv_risk.avg_churn_risk AS AVG(clv_risk.churn_risk_score) COMMENT = 'Average churn risk score',
+    weather_revenue.avg_daily_revenue AS AVG(weather_revenue.total_revenue) COMMENT = 'Average daily revenue'
+  )
+  COMMENT = 'Advanced analytics: Marketing Mix Modeling, Geo-Targeting, CLV Risk, and Weather Impact for Summit Gear Co.';

@@ -36,15 +36,22 @@ You now have a full workspace with all lab SQL files ready to open and run.
 
 Open `lab_guide/LAB_GUIDE.md` and work through each part. You'll open each SQL file in the workspace, review what it does, and run it step by step.
 
+## Architecture
+
+![Architecture Diagram](architecture_diagram.png)
+
 ## What You'll Build
 
 - **Synthetic dataset:** 6 tables in `MARKETING_RAW` for "Summit Gear Co." (DTC + wholesale outdoor brand)
-- **Marketplace enrichment:** Economic indicators, consumer demographics, weather data
-- **Dynamic tables:** 6 declarative transformation layers in `MARKETING_ANALYTICS`
-- **Cortex ML:** Revenue forecasting + anomaly detection
-- **Cortex AI:** Sentiment analysis, classification, extraction, summarization
-- **Semantic view + Agent:** Natural language Q&A over marketing data
-- **Streamlit dashboard:** Built interactively using Cortex Code prompts
+- **Marketplace enrichment:** Economic indicators, consumer demographics, weather data, consumer attitudes
+- **Dynamic tables:** 12 declarative transformation layers in `MARKETING_ANALYTICS`
+- **Cortex ML:** Revenue forecasting (with exogenous weather/economic features) + anomaly detection
+- **Cortex AI:** Sentiment analysis, classification, extraction, summarization, MMM insights, geo-targeting recommendations
+- **Marketing Mix Modeling:** Channel attribution, weekly spend decomposition, AI-generated budget recommendations
+- **Location-Based Targeting:** Composite geo-scoring, weather-triggered campaigns, per-state AI briefs
+- **CLV Risk Classification:** 5-tier customer segmentation with churn risk scoring
+- **Semantic views + Agent:** 4 semantic views backing a natural language Q&A agent
+- **Streamlit dashboard:** 5-page app with KPI Overview, Advanced Analytics, Forecasting, AI Insights, and Marketing Agent
 
 ## Marketplace Listings
 
@@ -86,8 +93,8 @@ teardown_all.sql                 -- Clean up everything
 
 | Schema | Purpose |
 |--------|---------|
-| `MARKETING_RAW` | Source tables, ML results, AI results, marketplace views |
-| `MARKETING_ANALYTICS` | Dynamic tables, semantic view, Cortex Agent |
+| `MARKETING_RAW` | Source tables, ML results, AI results, marketplace views, marketplace snapshots |
+| `MARKETING_ANALYTICS` | Dynamic tables, analytics tables (MMM, geo, CLV), semantic views, Cortex Agent |
 
 ## Teardown
 
