@@ -4,7 +4,19 @@ Paste this single prompt into Cortex Code:
 
 ---
 
-Build a Streamlit-in-Snowflake app for "Summit Gear Co." Use `get_active_session()` to connect. Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library. Do NOT use `use_column_width` (deprecated) on `st.sidebar.image()`. Wide layout, sidebar navigation with 5 pages. Store the `streamlit_app.py` and `environment.yml` in the stage `@MARKETING_AI_BI.MARKETING_ANALYTICS.STREAMLIT_STAGE/streamlit/`. The `environment.yml` should list required packages (streamlit, snowflake-snowpark-python, altair, pandas).
+**IMPORTANT: Before writing any code, read the file `helper_streamlit_skill/SKILL.md` in this project.** It contains critical SiS runtime constraints, the complete Cortex Agent response parser, Altair charting patterns, and deployment instructions. Follow it exactly for all Streamlit-in-Snowflake and Cortex Agent work.
+
+Build a Streamlit-in-Snowflake app for "Summit Gear Co." Wide layout, sidebar navigation with 5 pages. Store the `streamlit_app.py` and `environment.yml` in the stage `@MARKETING_AI_BI.MARKETING_ANALYTICS.STREAMLIT_STAGE/streamlit/`.
+
+## SiS Environment Rules (also in SKILL.md)
+
+- Use `get_active_session()` to connect — NOT `st.connection("snowflake")`.
+- Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library.
+- Do NOT use `use_column_width` (deprecated).
+- Do NOT use `nonlocal` in nested functions — causes `SyntaxError` in SiS. Use module-level functions with mutable list arguments instead.
+- The `environment.yml` should list: streamlit, snowflake-snowpark-python, altair, pandas (snowflake conda channel only).
+- Snowflake returns UPPERCASE column names — normalize with `df.columns = [c.upper() for c in df.columns]`.
+- Convert date columns with `pd.to_datetime()` before filtering.
 
 ## How to query data — SEMANTIC_VIEW syntax (CRITICAL)
 
@@ -21,7 +33,28 @@ SELECT * FROM SEMANTIC_VIEW(
 
 Rules: DIMENSIONS are grouping columns. METRICS are aggregates (SUM, COUNT, AVG — cross-entity joins allowed). FACTS are raw values (same-entity columns only, no cross-entity joins). All column references use `entity.column` format. Store view names as constants: `SV_MARKETING`, `SV_ML`, `SV_REVIEWS`, `SV_ADVANCED`.
 
-## Three semantic views and their entities
+Create a helper function for semantic view queries:
+
+```python
+def run_sv(sv, dimensions="", metrics="", facts="", where="", order="", limit=""):
+    parts = [f"SELECT * FROM SEMANTIC_VIEW(\n    {sv}"]
+    if dimensions:
+        parts.append(f"    DIMENSIONS {dimensions}")
+    if metrics:
+        parts.append(f"    METRICS {metrics}")
+    if facts:
+        parts.append(f"    FACTS {facts}")
+    if where:
+        parts.append(f"    WHERE {where}")
+    if limit:
+        parts.append(f"    LIMIT {limit}")
+    q = "\n".join(parts) + "\n)"
+    if order:
+        q += f" ORDER BY {order}"
+    return session.sql(q).to_pandas()
+```
+
+## Semantic views and their entities
 
 **SV_SUMMIT_GEAR_MARKETING** — entities: `campaigns` (campaign_name, channel, sub_channel, budget), `orders` (order_date, channel, product_category, product_name, revenue, quantity), `customers` (state, age, gender), `spend` (spend_date, amount, impressions, clicks, conversions), `partners` (partner_name, region, tier), `daily_revenue` (order_date, channel, total_revenue, order_count, avg_order_value), `product_revenue` (product_category, product_name, channel, total_revenue, order_count), `campaign_tiers` (campaign_name, channel, sub_channel, performance_tier, roas), `campaign_summaries` (campaign_name, channel, sub_channel, executive_summary). Metrics: `orders.total_revenue`, `orders.total_orders`, `orders.avg_order_value`, `spend.total_spend`, `spend.total_conversions`.
 
@@ -47,23 +80,30 @@ Rules: DIMENSIONS are grouping columns. METRICS are aggregates (SUM, COUNT, AVG 
 
 4. **AI Insights** — Sentiment histogram by channel from SV_REVIEWS (`DIMENSIONS sentiment.channel, sentiment.review_text FACTS sentiment.sentiment_score`). Theme summaries side-by-side (`DIMENSIONS themes.channel, themes.themes`). Campaign tier donut from SV_MARKETING (`DIMENSIONS campaign_tiers.performance_tier METRICS orders.total_orders`). Campaign executive summaries from SV_MARKETING (`DIMENSIONS campaign_summaries.campaign_name, campaign_summaries.channel, campaign_summaries.sub_channel, campaign_summaries.executive_summary`) — show as expandable cards grouped by channel. Expandable extract table (`DIMENSIONS extracts.product_category, extracts.product_name, extracts.channel, extracts.review_text, extracts.product_feedback, extracts.competitor_mention, extracts.recommendation FACTS extracts.rating LIMIT 50`).
 
-## Page 5 — Marketing Agent (REST API, not SQL)
+## Page 5 — Marketing Agent (REST API — MUST follow SKILL.md exactly)
 
 Call the agent via REST API using `_snowflake.send_snow_api_request()`. There is NO SQL function for agents.
 
-```python
-import _snowflake, json
+**You MUST copy the complete agent parsing code from `helper_streamlit_skill/SKILL.md` sections 3 and 4.** This includes:
 
+1. **`call_agent()`** — calls the REST API with retry logic (retries with `{"stream": True}` on non-200)
+2. **`_extract_result_set()`** — converts result_set JSON to DataFrame
+3. **`_extract_json_content()`** — extracts sql, text, and result_set from JSON content
+4. **`_walk_for_content()`** — recursive fallback walker for unknown formats
+5. **`process_sse_response()`** — handles ALL three response formats (single message dict, SSE event list, flat content dict)
+6. **`render_agent_response()`** — renders text as markdown, SQL in expanders, DataFrames as tables, with debug fallback
+
+All of these MUST be module-level functions (not nested inside `if`/`elif` blocks). They use mutable list arguments — never `nonlocal`.
+
+```python
 AGENT_ENDPOINT = "/api/v2/databases/MARKETING_AI_BI/schemas/MARKETING_ANALYTICS/agents/SUMMIT_GEAR_AGENT:run"
 AGENT_TIMEOUT = 60000
-
-def call_agent(question):
-    messages = [{"role": "user", "content": [{"type": "text", "text": question}]}]
-    payload = {"messages": messages}
-    resp = _snowflake.send_snow_api_request("POST", AGENT_ENDPOINT, {}, {}, payload, None, AGENT_TIMEOUT)
-    if resp["status"] != 200:
-        raise Exception(f"Agent error HTTP {resp['status']}: {resp.get('content','')}")
-    return json.loads(resp["content"])
 ```
 
-The non-streaming response format is: `{"message": {"content": [{"type": "text", "text": "..."}, {"type": "tool_results", "tool_results": {"content": [{"type": "json", "json": {"sql": "...", "text": "...", "result_set": {...}}}]}}]}}`. Parse `message.content[]` — extract text from `type: text` items, extract SQL/result_set from `type: tool_results` items. For result_set: columns are in `resultSetMetaData.rowType[].name`, rows in `data[]`. Build a recursive fallback walker in case the format varies. Show suggested questions as buttons, render text as markdown, SQL in expanders, result_set as `st.dataframe()`. The agent now has 4 tools: MarketingAnalyst, MLAnalyst, ReviewAnalyst, and AdvancedAnalyst (for MMM, geo-targeting, CLV, and weather impact queries).
+The agent has 4 tools: MarketingAnalyst, MLAnalyst, ReviewAnalyst, and AdvancedAnalyst.
+
+Show suggested question buttons (6 suggestions in 3 columns), use `st.chat_message` for conversation history, `st.chat_input` for user input, and `st.spinner("Thinking...")` while waiting. Store chat history in `st.session_state.agent_messages`.
+
+### Why this matters
+
+The Cortex Agent API returns responses in multiple formats depending on internal routing. `json.loads(resp["content"])` can return either a dict or a list. A naive parser that assumes one format (e.g., `response.get("message")`) will crash with `'list' object has no attribute 'get'`. The `process_sse_response()` function in the SKILL.md handles all known formats with a recursive fallback.
