@@ -3,13 +3,16 @@
   03_dynamic_tables/01_dynamic_tables.sql
 
   Creates 12 dynamic tables in the MARKETING_ANALYTICS schema that transform
-  raw source data from MARKETING_RAW into analytics-ready tables.
+  raw source data from MARKETING_RAW into analytics-ready tables, plus
+  two materialized tables derived from DT_GEO_TARGETING.
 
   Original (1-7):  Core revenue, campaigns, partners, customers, forecast,
                    spend, product metrics.
   Marketplace (8-11): Customer enrichment, geo-targeting, weather-revenue,
                       and marketing-mix-model daily — all fed by snapshot
                       tables created in 02_marketplace_enrichment.sql.
+  Derived (12-13): GEO_TARGETING_PROFILES and GEO_WEATHER_TRIGGERS —
+                   scored/classified views of DT_GEO_TARGETING.
 
   Participants can inspect the lineage graph in Snowsight:
   Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables
@@ -346,3 +349,63 @@ LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.ECONOMIC_INDICATORS_SNAPSHOT ei
     ON DATE_TRUNC('MONTH', d.ds)::DATE = ei.indicator_month
 LEFT JOIN MARKETING_AI_BI.MARKETING_RAW.NATIONAL_WEATHER_SNAPSHOT w
     ON d.ds = w.weather_date;
+
+----------------------------------------------------------------------
+-- 11. GEO_TARGETING_PROFILES -- Zip-level profiles with targeting score
+--     Materialized from DT_GEO_TARGETING with computed score & categories
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE GEO_TARGETING_PROFILES AS
+SELECT
+    g.*,
+    ROUND(
+        (COALESCE(g.avg_ltv, 0) / 3000.0) * 0.4
+        + (LEAST(g.customer_count, 100) / 100.0) * 0.3
+        + (COALESCE(g.total_revenue, 0)
+           / (SELECT MAX(total_revenue) FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_GEO_TARGETING)) * 0.3
+    , 3) AS targeting_score,
+    CASE
+        WHEN COALESCE(g.recent_total_snowfall, 0) > 5 THEN 'winter_sports'
+        WHEN COALESCE(g.recent_avg_temp, 60) > 75     THEN 'camping'
+        WHEN COALESCE(g.recent_avg_temp, 60) < 40      THEN 'outerwear'
+        WHEN COALESCE(g.recent_total_precip, 0) > 3    THEN 'footwear'
+        ELSE 'accessories'
+    END AS weather_recommended_category,
+    CASE
+        WHEN g.customer_count >= 10          THEN 'social'
+        WHEN COALESCE(g.avg_ltv, 0) > 1500  THEN 'email'
+        ELSE 'search'
+    END AS recommended_channel
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_GEO_TARGETING g;
+
+----------------------------------------------------------------------
+-- 12. GEO_WEATHER_TRIGGERS -- Weather-based campaign trigger actions
+--     Materialized from DT_GEO_TARGETING with trigger classification
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE GEO_WEATHER_TRIGGERS AS
+SELECT
+    g.state,
+    g.zip_code,
+    g.customer_count,
+    g.recent_avg_temp,
+    g.recent_total_precip,
+    g.recent_total_snowfall,
+    CASE
+        WHEN COALESCE(g.recent_total_snowfall, 0) > 10
+            THEN 'BLIZZARD ALERT — Push winter gear promos'
+        WHEN COALESCE(g.recent_total_snowfall, 0) > 5
+            THEN 'SNOW ADVISORY — Promote ski & outerwear'
+        WHEN COALESCE(g.recent_total_precip, 0) > 5
+            THEN 'HEAVY RAIN — Promote waterproof footwear'
+        WHEN COALESCE(g.recent_total_precip, 0) > 2
+            THEN 'RAIN ALERT — Promote rain gear & footwear'
+        WHEN COALESCE(g.recent_avg_temp, 60) > 90
+            THEN 'HEAT WAVE — Promote cooling & hydration gear'
+        WHEN COALESCE(g.recent_avg_temp, 60) > 80
+            THEN 'HOT WEATHER — Promote summer & camping gear'
+        WHEN COALESCE(g.recent_avg_temp, 60) < 20
+            THEN 'EXTREME COLD — Promote insulated outerwear'
+        WHEN COALESCE(g.recent_avg_temp, 60) < 35
+            THEN 'COLD SNAP — Promote layering & winter accessories'
+        ELSE 'NO TRIGGER'
+    END AS trigger_action
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_GEO_TARGETING g;

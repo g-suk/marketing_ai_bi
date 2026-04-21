@@ -14,7 +14,7 @@ Build a Streamlit-in-Snowflake app for "Summit Gear Co." Wide layout, sidebar na
 - Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library.
 - Do NOT use `use_column_width` (deprecated).
 - Do NOT use `nonlocal` in nested functions — causes `SyntaxError` in SiS. Use module-level functions with mutable list arguments instead.
-- The `environment.yml` should list: streamlit, snowflake-snowpark-python, altair, pandas (snowflake conda channel only).
+- The `environment.yml` should list: streamlit, snowflake-snowpark-python, altair, pandas, pydeck (snowflake conda channel only).
 - Snowflake returns UPPERCASE column names — normalize with `df.columns = [c.upper() for c in df.columns]`.
 - Convert date columns with `pd.to_datetime()` before filtering.
 
@@ -72,7 +72,22 @@ def run_sv(sv, dimensions="", metrics="", facts="", where="", order="", limit=""
 
    **Tab 1 - Marketing Mix Model:** Quarter selector. Bar chart of attributed revenue by sub_channel colored by ROI from `MMM_CHANNEL_CONTRIBUTIONS` (columns: sub_channel, period, total_spend, attributed_revenue, roi, share_of_spend). Weekly line chart of spend (dashed) vs attributed revenue (solid) by channel from `MMM_WEEKLY_DECOMPOSITION` (columns: week_start, sub_channel, spend, attributed_revenue, efficiency_index) with multi-select channel filter. AI insights text from `MMM_AI_INSIGHTS` (column: insight_text).
 
-   **Tab 2 - Geo-Targeting:** State-level aggregated bar chart (top 20 by revenue, colored by targeting score) from `GEO_TARGETING_PROFILES` (columns: state, zip_code, customer_count, avg_ltv, total_revenue, targeting_score, weather_recommended_category, recommended_channel). Weather trigger summary bar chart from `GEO_WEATHER_TRIGGERS` (columns: trigger_action, recommended_product_category — group by trigger_action excluding 'NO TRIGGER'). AI state recommendation cards from `GEO_AI_RECOMMENDATIONS` (columns: state, customer_count, avg_ltv, total_revenue, recommendation) with state selector.
+   **Tab 2 - Geo-Targeting:** Pydeck scatter map of US states using `st.pydeck_chart()` with `pdk.Layer("ScatterplotLayer")`. Query `GEO_TARGETING_PROFILES` grouped by state (SUM customer_count, AVG avg_ltv, SUM total_revenue, AVG targeting_score). Map state abbreviations to lat/lon centroids using a dict:
+   ```python
+   STATE_COORDS = {
+       'CA': (36.78, -119.42), 'TX': (31.97, -99.90), 'NY': (42.17, -74.95),
+       'FL': (27.66, -81.52), 'CO': (39.55, -105.78), 'WA': (47.75, -120.74),
+       'OR': (43.80, -120.55), 'UT': (39.32, -111.09), 'MT': (46.88, -110.36),
+       'ID': (44.07, -114.74), 'AZ': (34.05, -111.09), 'NC': (35.76, -79.02),
+       'VA': (37.43, -78.66), 'GA': (32.16, -82.90), 'PA': (41.20, -77.19),
+       'IL': (40.63, -89.40), 'OH': (40.42, -82.91), 'MI': (44.31, -84.71),
+       'MN': (46.73, -94.69), 'WI': (43.78, -88.79), 'MA': (42.41, -71.38),
+       'NJ': (40.06, -74.41), 'CT': (41.60, -72.76), 'NH': (43.19, -71.57),
+       'VT': (44.56, -72.58), 'ME': (45.25, -69.45), 'NM': (34.52, -105.87),
+       'NV': (38.80, -116.42), 'TN': (35.52, -86.58), 'SC': (33.84, -81.16),
+   }
+   ```
+   Add LAT/LON columns via `.map()`. Compute RADIUS proportional to total_revenue (scaled to max ~120000). Color by targeting_score (red-green gradient). Set initial view to US center (lat=39.83, lon=-98.58, zoom=3.2). Enable tooltips showing state, revenue, customers, score. Below the map, show the same state-level aggregated bar chart (top 20 by revenue, colored by targeting score). Weather trigger summary bar chart from `GEO_WEATHER_TRIGGERS` (columns: trigger_action — group by trigger_action excluding 'NO TRIGGER'). AI state recommendation cards from `GEO_AI_RECOMMENDATIONS` (columns: state, customer_count, avg_ltv, total_revenue, recommendation) with state selector.
 
    **Tab 3 - CLV & Churn:** CLV tier donut chart and summary metrics from `CLV_RISK_CLASSIFICATION` (columns: customer_id, clv_tier, lifetime_value, churn_risk_score, total_orders, lifestyle_segment, outdoor_interest). Normalized stacked bar of CLV tier mix by lifestyle_segment. Weather impact on revenue bar chart by temp_band from `DT_WEATHER_REVENUE` (columns: temp_band, total_revenue — group and average).
 

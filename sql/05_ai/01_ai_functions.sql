@@ -11,6 +11,7 @@
     3. AI_EXTRACT on review text
     4. AI_COMPLETE for campaign executive summaries
     5. AI_AGG for theme aggregation by channel
+    6. AI_COMPLETE for geo-targeted state recommendations
 =============================================================================*/
 
 USE DATABASE MARKETING_AI_BI;
@@ -106,3 +107,33 @@ SELECT
     AI_SUMMARIZE_AGG(review_text) AS themes
 FROM MARKETING_AI_BI.MARKETING_RAW.PRODUCT_REVIEWS
 GROUP BY channel;
+
+----------------------------------------------------------------------
+-- 6. AI_COMPLETE -- Geo-targeted state recommendations
+--    Aggregates GEO_TARGETING_PROFILES by state and generates an
+--    AI marketing recommendation for each state.
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE GEO_AI_RECOMMENDATIONS AS
+SELECT
+    state,
+    customer_count,
+    avg_ltv,
+    total_revenue,
+    SNOWFLAKE.CORTEX.COMPLETE(
+        'snowflake-llama-3.3-70b',
+        'You are a marketing strategist for Summit Gear Co., an outdoor recreation retailer. '
+        || 'Given the following state-level metrics, provide 2-3 concise geo-targeted marketing recommendations. '
+        || 'State: ' || state
+        || '. Customers: ' || customer_count::VARCHAR
+        || '. Average LTV: $' || ROUND(avg_ltv, 2)::VARCHAR
+        || '. Total Revenue: $' || ROUND(total_revenue, 2)::VARCHAR || '.'
+    ) AS recommendation
+FROM (
+    SELECT
+        state,
+        SUM(customer_count) AS customer_count,
+        ROUND(AVG(avg_ltv), 2) AS avg_ltv,
+        ROUND(SUM(total_revenue), 2) AS total_revenue
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_TARGETING_PROFILES
+    GROUP BY state
+);

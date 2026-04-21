@@ -1,6 +1,7 @@
 import streamlit as st
 import altair as alt
 import pandas as pd
+import pydeck as pdk
 import json
 import _snowflake
 from snowflake.snowpark.context import get_active_session
@@ -344,10 +345,46 @@ elif page == "Advanced Analytics":
 
     with tab2:
         st.subheader("Geo-Targeting")
-        geo = run_query("SELECT state, SUM(customer_count) AS customer_count, ROUND(AVG(avg_ltv),2) AS avg_ltv, SUM(total_revenue) AS total_revenue, ROUND(AVG(targeting_score),3) AS targeting_score FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_TARGETING_PROFILES GROUP BY state ORDER BY total_revenue DESC LIMIT 20")
+        STATE_COORDS = {
+            'CA': (36.78, -119.42), 'TX': (31.97, -99.90), 'NY': (42.17, -74.95),
+            'FL': (27.66, -81.52), 'CO': (39.55, -105.78), 'WA': (47.75, -120.74),
+            'OR': (43.80, -120.55), 'UT': (39.32, -111.09), 'MT': (46.88, -110.36),
+            'ID': (44.07, -114.74), 'AZ': (34.05, -111.09), 'NC': (35.76, -79.02),
+            'VA': (37.43, -78.66), 'GA': (32.16, -82.90), 'PA': (41.20, -77.19),
+            'IL': (40.63, -89.40), 'OH': (40.42, -82.91), 'MI': (44.31, -84.71),
+            'MN': (46.73, -94.69), 'WI': (43.78, -88.79), 'MA': (42.41, -71.38),
+            'NJ': (40.06, -74.41), 'CT': (41.60, -72.76), 'NH': (43.19, -71.57),
+            'VT': (44.56, -72.58), 'ME': (45.25, -69.45), 'NM': (34.52, -105.87),
+            'NV': (38.80, -116.42), 'TN': (35.52, -86.58), 'SC': (33.84, -81.16),
+        }
+        geo = run_query("SELECT state, SUM(customer_count) AS customer_count, ROUND(AVG(avg_ltv),2) AS avg_ltv, ROUND(SUM(total_revenue),2) AS total_revenue, ROUND(AVG(targeting_score),3) AS targeting_score FROM MARKETING_AI_BI.MARKETING_ANALYTICS.GEO_TARGETING_PROFILES GROUP BY state ORDER BY total_revenue DESC")
         if not geo.empty:
+            geo["LAT"] = geo["STATE"].map(lambda s: STATE_COORDS.get(s, (39.83, -98.58))[0])
+            geo["LON"] = geo["STATE"].map(lambda s: STATE_COORDS.get(s, (39.83, -98.58))[1])
+            max_rev = geo["TOTAL_REVENUE"].max()
+            geo["RADIUS"] = geo["TOTAL_REVENUE"].apply(lambda r: max(8000, int((r / max_rev) * 120000)))
+            geo["COLOR_R"] = geo["TARGETING_SCORE"].apply(lambda s: min(255, int(s * 500)))
+            geo["COLOR_G"] = geo["TARGETING_SCORE"].apply(lambda s: max(0, int(180 - s * 300)))
+            geo["COLOR_B"] = 60
+
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=geo,
+                get_position=["LON", "LAT"],
+                get_radius="RADIUS",
+                get_fill_color=["COLOR_R", "COLOR_G", "COLOR_B", 180],
+                pickable=True,
+            )
+            view = pdk.ViewState(latitude=39.83, longitude=-98.58, zoom=3.2, pitch=0)
+            deck = pdk.Deck(
+                layers=[layer],
+                initial_view_state=view,
+                tooltip={"text": "{STATE}\nRevenue: ${TOTAL_REVENUE}\nCustomers: {CUSTOMER_COUNT}\nScore: {TARGETING_SCORE}"},
+            )
+            st.pydeck_chart(deck)
+
             bar = (
-                alt.Chart(geo)
+                alt.Chart(geo.head(20))
                 .mark_bar()
                 .encode(
                     x=alt.X("TOTAL_REVENUE:Q", title="Revenue ($)"),

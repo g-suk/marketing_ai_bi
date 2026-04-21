@@ -2,6 +2,7 @@
 AGENTS.md
 BUILD_PROMPT.md
 PLAN.md
+TALKING_POINTS.md
 .snowflake/
 scripts/generate_data.py
 
