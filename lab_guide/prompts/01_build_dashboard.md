@@ -12,6 +12,7 @@ Build a Streamlit-in-Snowflake app for "Summit Gear Co." Wide layout, sidebar na
 
 - Use `get_active_session()` to connect — NOT `st.connection("snowflake")`.
 - Use Altair (`import altair as alt`) for all charts (SVG rendering). Do NOT use plotly or any WebGL-based charting library.
+- When layering Altair charts with `+`, ALL layers MUST have identical `.properties(height=...)` values or SiS throws `ValueError: inconsistent values for height`.
 - Do NOT use `use_column_width` (deprecated).
 - Do NOT use `nonlocal` in nested functions — causes `SyntaxError` in SiS. Use module-level functions with mutable list arguments instead.
 - The `environment.yml` should list: streamlit, snowflake-snowpark-python, altair, pandas, pydeck (snowflake conda channel only).
@@ -46,11 +47,11 @@ def run_sv(sv, dimensions="", metrics="", facts="", where="", order="", limit=""
         parts.append(f"    FACTS {facts}")
     if where:
         parts.append(f"    WHERE {where}")
-    if limit:
-        parts.append(f"    LIMIT {limit}")
     q = "\n".join(parts) + "\n)"
     if order:
         q += f" ORDER BY {order}"
+    if limit:
+        q += f" LIMIT {limit}"
     return session.sql(q).to_pandas()
 ```
 
@@ -68,11 +69,11 @@ def run_sv(sv, dimensions="", metrics="", facts="", where="", order="", limit=""
 
 1. **KPI Overview** — metric cards (total revenue, DTC revenue, wholesale revenue, total orders, avg order value, ROAS) using `DIMENSIONS campaigns.channel METRICS orders.total_revenue, orders.total_orders, orders.avg_order_value, spend.total_spend`. Daily revenue line chart by channel using `DIMENSIONS daily_revenue.order_date, daily_revenue.channel FACTS daily_revenue.total_revenue` with date range filter. Revenue by product category bar chart using `DIMENSIONS product_revenue.product_category FACTS product_revenue.total_revenue`.
 
-2. **Advanced Analytics** — Three tabs: "Marketing Mix Model", "Geo-Targeting", "CLV & Churn". Use direct SQL queries (not SEMANTIC_VIEW) against these tables:
+2. **Advanced Analytics** — Three tabs: "Marketing Mix Model", "Geo-Targeting", "CLV & Churn". Use direct SQL queries (not SEMANTIC_VIEW) against these tables. Each tab should include a collapsible `st.expander()` at the top explaining the methodology (how the score/model works, what the data pipeline is). Keep expanders concise — a short paragraph plus a few bullet points max. Avoid tables or lengthy breakdowns inside expanders; they should be scannable in 5 seconds.
 
    **Tab 1 - Marketing Mix Model:** Quarter selector. Bar chart of attributed revenue by sub_channel colored by ROI from `MMM_CHANNEL_CONTRIBUTIONS` (columns: sub_channel, period, total_spend, attributed_revenue, roi, share_of_spend). Weekly line chart of spend (dashed) vs attributed revenue (solid) by channel from `MMM_WEEKLY_DECOMPOSITION` (columns: week_start, sub_channel, spend, attributed_revenue, efficiency_index) with multi-select channel filter. AI insights text from `MMM_AI_INSIGHTS` (column: insight_text).
 
-   **Tab 2 - Geo-Targeting:** Pydeck scatter map of US states using `st.pydeck_chart()` with `pdk.Layer("ScatterplotLayer")`. Query `GEO_TARGETING_PROFILES` grouped by state (SUM customer_count, AVG avg_ltv, SUM total_revenue, AVG targeting_score). Map state abbreviations to lat/lon centroids using a dict:
+   **Tab 2 - Geo-Targeting:** Title this section "Geo-Targeting: Market Opportunity Index". The targeting score is a *Market Opportunity Index* — it measures where marketing dollars will generate the highest return based on proven customer behavior (40% avg LTV, 30% customer density, 30% revenue share). It is NOT propensity to buy or product fit. Use `st.caption()` for a simple one-line legend below the map: "Bubble size = total revenue | Color = Market Opportunity Index (Low → High)". Do NOT build an Altair color legend chart — keep it clean with just the caption. Pydeck scatter map of US states using `st.pydeck_chart()` with `pdk.Layer("ScatterplotLayer")`. Query `GEO_TARGETING_PROFILES` grouped by state (SUM customer_count, AVG avg_ltv, SUM total_revenue, AVG targeting_score). Map state abbreviations to lat/lon centroids using a dict:
    ```python
    STATE_COORDS = {
        'CA': (36.78, -119.42), 'TX': (31.97, -99.90), 'NY': (42.17, -74.95),
