@@ -31,7 +31,7 @@ USE WAREHOUSE COMPUTE_WH;
 -- 1. DT_DAILY_REVENUE -- Daily revenue by channel
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_DAILY_REVENUE
-    TARGET_LAG = '1 hour'
+    TARGET_LAG = '1 day'
     WAREHOUSE = COMPUTE_WH
 AS
 SELECT
@@ -48,7 +48,7 @@ GROUP BY order_date, channel;
 -- 2. DT_CAMPAIGN_METRICS -- Campaign-level KPIs
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_CAMPAIGN_METRICS
-    TARGET_LAG = '1 hour'
+    TARGET_LAG = '1 day'
     WAREHOUSE = COMPUTE_WH
 AS
 SELECT
@@ -100,7 +100,7 @@ LEFT JOIN (
 -- 3. DT_PARTNER_PERFORMANCE -- Wholesale partner metrics
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_PARTNER_PERFORMANCE
-    TARGET_LAG = '1 hour'
+    TARGET_LAG = '1 day'
     WAREHOUSE = COMPUTE_WH
 AS
 SELECT
@@ -241,7 +241,7 @@ GROUP BY ds, sub_channel;
 -- 7. DT_PRODUCT_REVENUE -- Revenue by product category
 ----------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE DT_PRODUCT_REVENUE
-    TARGET_LAG = '1 hour'
+    TARGET_LAG = '1 day'
     WAREHOUSE = COMPUTE_WH
 AS
 SELECT

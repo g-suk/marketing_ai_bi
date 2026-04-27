@@ -120,7 +120,7 @@ wide_arrow(y + ROW_H, "#B3E5FC", "auto-refresh")
 # ===================== ROW 3: Dynamic Tables =====================
 y = rows["dynamic"]
 rbox(M, y, CW, ROW_H, BLUE_L, CYAN)
-txt(M + 12, y + 12, "MARKETING_ANALYTICS  —  Dynamic Tables  (TARGET_LAG: 1h / DOWNSTREAM)", font_h2, BLUE_D, "lm")
+txt(M + 12, y + 12, "MARKETING_ANALYTICS  —  Dynamic Tables  (TARGET_LAG: 1d / DOWNSTREAM)", font_h2, BLUE_D, "lm")
 dts = [
     ("DT_DAILY\nREVENUE", "1.3K"),
     ("DT_CAMPAIGN\nMETRICS", "70"),
