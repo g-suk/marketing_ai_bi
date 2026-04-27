@@ -18,6 +18,17 @@ SV_ADVANCED = "MARKETING_AI_BI.MARKETING_ANALYTICS.SV_SUMMIT_GEAR_ADVANCED"
 AGENT_ENDPOINT = "/api/v2/databases/MARKETING_AI_BI/schemas/MARKETING_ANALYTICS/agents/SUMMIT_GEAR_AGENT:run"
 AGENT_TIMEOUT = 60000
 
+ROAS_TARGETS = {
+    "email": 35.0,
+    "search": 35.0,
+    "social": 30.0,
+    "influencer": 35.0,
+    "co_op_ad": 35.0,
+    "trade_promo": 30.0,
+    "distributor_event": 20.0,
+}
+ROAS_TARGET_OVERALL = 35.0
+
 
 def run_query(sql):
     return session.sql(sql).to_pandas()
@@ -249,7 +260,20 @@ if page == "KPI Overview":
     c3.metric("Wholesale Revenue", f"${ws_rev:,.0f}")
     c4.metric("Total Orders", f"{total_orders:,.0f}")
     c5.metric("Avg Order Value", f"${avg_ov:,.2f}")
-    c6.metric("ROAS", f"{roas:.2f}x")
+    roas_delta = roas - ROAS_TARGET_OVERALL
+    c6.metric("ROAS", f"{roas:.2f}x", delta=f"{roas_delta:+.2f}x vs {ROAS_TARGET_OVERALL:.0f}x target")
+
+    journey_kpi = run_query(
+        "SELECT COUNT(*) AS conversions, ROUND(AVG(total_touchpoints),1) AS avg_tp, "
+        "ROUND(AVG(journey_duration_days),1) AS avg_days "
+        "FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_JOURNEY_SUMMARY"
+    )
+    if not journey_kpi.empty:
+        jk = journey_kpi.iloc[0]
+        j1, j2, j3 = st.columns(3)
+        j1.metric("Attributed Conversions", f"{jk['CONVERSIONS']:,.0f}")
+        j2.metric("Avg Touchpoints/Journey", f"{jk['AVG_TP']:.1f}")
+        j3.metric("Avg Days to Convert", f"{jk['AVG_DAYS']:.1f}")
 
     st.subheader("Daily Revenue by Channel")
     daily = run_sv(
@@ -303,7 +327,7 @@ if page == "KPI Overview":
 # ─── PAGE 2: Advanced Analytics ────────────────────────────────────────────────
 elif page == "Advanced Analytics":
     st.title("🔬 Advanced Analytics")
-    tab1, tab2, tab3 = st.tabs(["Marketing Mix Model", "Geo-Targeting", "CLV & Churn"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Marketing Mix Model", "Multi-Touch Attribution", "Geo-Targeting", "CLV & Churn"])
 
     with tab1:
         st.subheader("Marketing Mix Model")
@@ -341,6 +365,23 @@ elif page == "Advanced Analytics":
             )
             st.altair_chart(bar, use_container_width=True)
 
+            st.markdown("#### ROAS vs Target")
+            target_df = pdata.copy()
+            target_df["TARGET_ROAS"] = target_df["SUB_CHANNEL"].map(ROAS_TARGETS)
+            target_df["DELTA"] = target_df["ROI"] - target_df["TARGET_ROAS"]
+            target_df["STATUS"] = target_df["DELTA"].apply(lambda d: "Above Target" if d >= 0 else "Below Target")
+            bars_roas = alt.Chart(target_df).mark_bar().encode(
+                x=alt.X("ROI:Q", title="ROAS"),
+                y=alt.Y("SUB_CHANNEL:N", sort="-x", title="Channel"),
+                color=alt.Color("STATUS:N", scale=alt.Scale(domain=["Above Target", "Below Target"], range=["#2EC4B6", "#FF6B6B"])),
+            )
+            ticks = alt.Chart(target_df).mark_tick(color="black", thickness=2, size=20).encode(
+                x="TARGET_ROAS:Q",
+                y=alt.Y("SUB_CHANNEL:N", sort="-x"),
+            )
+            st.altair_chart((bars_roas + ticks).properties(height=250), use_container_width=True)
+            st.caption("Black tick = target ROAS per channel")
+
         mmm_weekly = run_query("SELECT week_start, sub_channel, spend, attributed_revenue, efficiency_index FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_WEEKLY_DECOMPOSITION ORDER BY week_start")
         if not mmm_weekly.empty:
             channels = sorted(mmm_weekly["SUB_CHANNEL"].unique())
@@ -356,11 +397,96 @@ elif page == "Advanced Analytics":
             st.altair_chart((spend_line + rev_line).properties(height=300), use_container_width=True)
             st.caption("Dashed = Spend, Solid = Attributed Revenue")
 
+            eff_data = wdata.groupby("WEEK_START", as_index=False)["EFFICIENCY_INDEX"].mean()
+            eff_line = alt.Chart(eff_data).mark_line(color="steelblue").encode(
+                x="WEEK_START:T", y=alt.Y("EFFICIENCY_INDEX:Q", title="Avg Efficiency Index")
+            )
+            target_rule = alt.Chart(pd.DataFrame({"y": [ROAS_TARGET_OVERALL]})).mark_rule(
+                color="red", strokeDash=[5, 5], strokeWidth=2
+            ).encode(y="y:Q")
+            st.altair_chart((eff_line + target_rule).properties(height=200), use_container_width=True)
+            st.caption(f"Red dashed line = target ROAS ({ROAS_TARGET_OVERALL:.0f}x)")
+
         insights = run_query("SELECT insight_text FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_AI_INSIGHTS")
         if not insights.empty:
             st.info(insights.iloc[0]["INSIGHT_TEXT"])
 
     with tab2:
+        st.subheader("Multi-Touch Attribution")
+        with st.expander("How MTA Works"):
+            st.markdown(
+                "**Multi-Touch Attribution (MTA)** distributes conversion credit across all "
+                "marketing channels a customer was exposed to within a 30-day window before purchase.\n\n"
+                "Five models are compared: **First Touch** (100% to first channel), **Last Touch** "
+                "(100% to last channel), **Linear** (equal split), **Time Decay** (more credit to "
+                "recent touches), and **Position-Based** (40% first, 40% last, 20% middle).\n\n"
+                "Each conversion is matched to sub-channels with active spend in the 30 days prior, "
+                "producing ~5.8 touchpoints per journey on average across 7 sub-channels."
+            )
+
+        journey_kpis = run_query(
+            "SELECT COUNT(*) AS total_conversions, "
+            "ROUND(AVG(total_touchpoints),1) AS avg_touchpoints, "
+            "ROUND(AVG(journey_duration_days),1) AS avg_journey_days "
+            "FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_JOURNEY_SUMMARY"
+        )
+        if not journey_kpis.empty:
+            jk = journey_kpis.iloc[0]
+            jc1, jc2, jc3 = st.columns(3)
+            jc1.metric("Total Conversions", f"{jk['TOTAL_CONVERSIONS']:,.0f}")
+            jc2.metric("Avg Touchpoints/Journey", f"{jk['AVG_TOUCHPOINTS']:.1f}")
+            jc3.metric("Avg Days to Conversion", f"{jk['AVG_JOURNEY_DAYS']:.1f}")
+
+        attr_data = run_query(
+            "SELECT * FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_CHANNEL_ATTRIBUTION_SUMMARY "
+            "ORDER BY model_name, total_attributed_revenue DESC"
+        )
+        if not attr_data.empty:
+            st.markdown("#### Model Comparison: Attributed Revenue by Channel")
+            grouped_bar = (
+                alt.Chart(attr_data)
+                .mark_bar()
+                .encode(
+                    x=alt.X("SUB_CHANNEL:N", title="Channel", sort="-y"),
+                    y=alt.Y("TOTAL_ATTRIBUTED_REVENUE:Q", title="Attributed Revenue ($)"),
+                    color=alt.Color("MODEL_NAME:N", title="Model"),
+                    xOffset="MODEL_NAME:N",
+                    tooltip=["SUB_CHANNEL", "MODEL_NAME", "TOTAL_ATTRIBUTED_REVENUE", "CONVERSIONS_ATTRIBUTED"],
+                )
+                .properties(height=400)
+            )
+            st.altair_chart(grouped_bar, use_container_width=True)
+
+            st.markdown("#### Single Model Breakdown")
+            model_names = sorted(attr_data["MODEL_NAME"].unique())
+            sel_model = st.selectbox("Attribution Model", model_names, key="mta_model")
+            model_data = attr_data[attr_data["MODEL_NAME"] == sel_model].sort_values("TOTAL_ATTRIBUTED_REVENUE", ascending=False)
+            model_bar = (
+                alt.Chart(model_data)
+                .mark_bar()
+                .encode(
+                    x=alt.X("TOTAL_ATTRIBUTED_REVENUE:Q", title="Attributed Revenue ($)"),
+                    y=alt.Y("SUB_CHANNEL:N", sort="-x", title="Channel"),
+                    color=alt.Color("SUB_CHANNEL:N", legend=None),
+                    tooltip=["SUB_CHANNEL", "TOTAL_ATTRIBUTED_REVENUE", "CONVERSIONS_ATTRIBUTED"],
+                )
+                .properties(height=250)
+            )
+            st.altair_chart(model_bar, use_container_width=True)
+
+            st.markdown("#### Consensus Ranking")
+            st.caption("Average rank across all 5 attribution models (lower = more credit)")
+            attr_data["RANK"] = attr_data.groupby("MODEL_NAME")["TOTAL_ATTRIBUTED_REVENUE"].rank(ascending=False).astype(int)
+            consensus = attr_data.groupby("SUB_CHANNEL", as_index=False).agg(
+                avg_rank=("RANK", "mean"),
+                total_rev_all_models=("TOTAL_ATTRIBUTED_REVENUE", "sum"),
+            ).sort_values("avg_rank")
+            consensus["avg_rank"] = consensus["avg_rank"].round(1)
+            consensus["total_rev_all_models"] = consensus["total_rev_all_models"].apply(lambda x: f"${x:,.0f}")
+            consensus.columns = ["Channel", "Avg Rank", "Total Attributed Rev (All Models)"]
+            st.dataframe(consensus, use_container_width=True, hide_index=True)
+
+    with tab3:
         st.subheader("Geo-Targeting: Market Opportunity Index")
         with st.expander("How Geo-Targeting Works"):
             st.markdown(
@@ -439,7 +565,7 @@ elif page == "Advanced Analytics":
             st.metric("Avg LTV", f"${row['AVG_LTV']:,.2f}")
             st.markdown(row["RECOMMENDATION"])
 
-    with tab3:
+    with tab4:
         st.subheader("CLV & Churn Risk")
         with st.expander("How CLV & Churn Classification Works"):
             st.markdown(

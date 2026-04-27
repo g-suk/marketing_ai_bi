@@ -2,9 +2,9 @@
   Summit Gear Co. -- Marketing AI+BI Lab
   03_dynamic_tables/01_dynamic_tables.sql
 
-  Creates 12 dynamic tables in the MARKETING_ANALYTICS schema that transform
+  Creates dynamic tables in the MARKETING_ANALYTICS schema that transform
   raw source data from MARKETING_RAW into analytics-ready tables, plus
-  two materialized tables derived from DT_GEO_TARGETING.
+  materialized derived tables for geo-targeting, MMM, CLV, and attribution.
 
   Original (1-7):  Core revenue, campaigns, partners, customers, forecast,
                    spend, product metrics.
@@ -13,6 +13,11 @@
                       tables created in 02_marketplace_enrichment.sql.
   Derived (12-13): GEO_TARGETING_PROFILES and GEO_WEATHER_TRIGGERS —
                    scored/classified views of DT_GEO_TARGETING.
+  MMM (14-16): Marketing Mix Model channel contributions, weekly
+               decomposition, and AI insights.
+  CLV (17): Customer lifetime value tiers and churn risk classification.
+  MTA (18-19): Multi-touch attribution touchpoints and journey summaries.
+  Attribution Views (20-25): 5 rule-based models + unified summary view.
 
   Participants can inspect the lineage graph in Snowsight:
   Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables
@@ -376,6 +381,379 @@ SELECT
         ELSE 'search'
     END AS recommended_channel
 FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_GEO_TARGETING g;
+
+----------------------------------------------------------------------
+-- 14. MMM_CHANNEL_CONTRIBUTIONS -- Quarterly channel-level MMM results
+--     Distributes total daily revenue across sub-channels proportional
+--     to each channel's share of weekly spend, weighted by conversion
+--     efficiency. ROI = attributed_revenue / total_spend.
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE MMM_CHANNEL_CONTRIBUTIONS AS
+WITH weekly_spend AS (
+    SELECT
+        DATE_TRUNC('week', ds) AS week_start,
+        sub_channel,
+        SUM(total_spend) AS weekly_spend,
+        SUM(total_conversions) AS weekly_conversions
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_SPEND_DAILY
+    GROUP BY DATE_TRUNC('week', ds), sub_channel
+),
+weekly_revenue AS (
+    SELECT
+        DATE_TRUNC('week', order_date) AS week_start,
+        SUM(total_revenue) AS weekly_revenue
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_DAILY_REVENUE
+    GROUP BY DATE_TRUNC('week', order_date)
+),
+spend_share AS (
+    SELECT
+        ws.week_start,
+        ws.sub_channel,
+        ws.weekly_spend,
+        ws.weekly_conversions,
+        wr.weekly_revenue,
+        ws.weekly_spend / NULLIF(SUM(ws.weekly_spend) OVER (PARTITION BY ws.week_start), 0) AS spend_share,
+        CASE WHEN ws.weekly_spend > 0
+             THEN ws.weekly_conversions::FLOAT / ws.weekly_spend
+             ELSE 0
+        END AS conversion_efficiency
+    FROM weekly_spend ws
+    JOIN weekly_revenue wr ON ws.week_start = wr.week_start
+),
+weighted AS (
+    SELECT *,
+        spend_share * (1 + conversion_efficiency) AS raw_weight,
+        SUM(spend_share * (1 + conversion_efficiency)) OVER (PARTITION BY week_start) AS total_weight
+    FROM spend_share
+),
+attributed AS (
+    SELECT
+        week_start,
+        sub_channel,
+        weekly_spend,
+        weekly_revenue,
+        ROUND(weekly_revenue * raw_weight / NULLIF(total_weight, 0), 2) AS attributed_revenue,
+        weekly_conversions
+    FROM weighted
+)
+SELECT
+    sub_channel,
+    'Q' || QUARTER(week_start) || '_' || YEAR(week_start) AS period,
+    ROUND(SUM(weekly_spend), 2) AS total_spend,
+    ROUND(SUM(attributed_revenue), 2) AS attributed_revenue,
+    ROUND(SUM(attributed_revenue) / NULLIF(SUM(weekly_spend), 0), 2) AS roi,
+    ROUND(SUM(weekly_spend) / NULLIF(SUM(SUM(weekly_spend)) OVER (PARTITION BY 'Q' || QUARTER(week_start) || '_' || YEAR(week_start)), 0) * 100, 1) AS share_of_spend,
+    ROUND(SUM(weekly_spend) / NULLIF(SUM(weekly_conversions), 0), 2) AS cost_per_conversion
+FROM attributed
+GROUP BY sub_channel, 'Q' || QUARTER(week_start) || '_' || YEAR(week_start);
+
+----------------------------------------------------------------------
+-- 15. MMM_WEEKLY_DECOMPOSITION -- Weekly spend vs. attributed revenue
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE MMM_WEEKLY_DECOMPOSITION AS
+WITH weekly_spend AS (
+    SELECT
+        DATE_TRUNC('week', ds) AS week_start,
+        sub_channel,
+        SUM(total_spend) AS spend,
+        SUM(total_conversions) AS conversions
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_SPEND_DAILY
+    GROUP BY DATE_TRUNC('week', ds), sub_channel
+),
+weekly_revenue AS (
+    SELECT DATE_TRUNC('week', order_date) AS week_start, SUM(total_revenue) AS weekly_revenue
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_DAILY_REVENUE
+    GROUP BY DATE_TRUNC('week', order_date)
+),
+spend_share AS (
+    SELECT ws.*, wr.weekly_revenue,
+        ws.spend / NULLIF(SUM(ws.spend) OVER (PARTITION BY ws.week_start), 0) AS s_share,
+        CASE WHEN ws.spend > 0 THEN ws.conversions::FLOAT / ws.spend ELSE 0 END AS conv_eff
+    FROM weekly_spend ws
+    JOIN weekly_revenue wr ON ws.week_start = wr.week_start
+),
+weighted AS (
+    SELECT *,
+        s_share * (1 + conv_eff) AS rw,
+        SUM(s_share * (1 + conv_eff)) OVER (PARTITION BY week_start) AS tw
+    FROM spend_share
+)
+SELECT
+    week_start,
+    sub_channel,
+    ROUND(spend, 2) AS spend,
+    ROUND(weekly_revenue * rw / NULLIF(tw, 0), 2) AS attributed_revenue,
+    ROUND(weekly_revenue * rw / NULLIF(tw, 0) - spend, 2) AS incremental_revenue,
+    ROUND(weekly_revenue * rw / NULLIF(tw, 0) / NULLIF(spend, 0), 3) AS efficiency_index
+FROM weighted
+ORDER BY week_start, sub_channel;
+
+----------------------------------------------------------------------
+-- 16. MMM_AI_INSIGHTS -- LLM-generated strategic MMM summary
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE MMM_AI_INSIGHTS AS
+WITH channel_summary AS (
+    SELECT
+        sub_channel,
+        ROUND(SUM(total_spend), 0) AS total_spend,
+        ROUND(SUM(attributed_revenue), 0) AS total_attributed,
+        ROUND(SUM(attributed_revenue) / NULLIF(SUM(total_spend), 0), 2) AS overall_roi
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.MMM_CHANNEL_CONTRIBUTIONS
+    GROUP BY sub_channel
+    ORDER BY overall_roi DESC
+)
+SELECT
+    SNOWFLAKE.CORTEX.COMPLETE(
+        'snowflake-llama-3.3-70b',
+        'You are a senior marketing analytics strategist for Summit Gear Co., an outdoor recreation retailer. '
+        || 'Analyze this Marketing Mix Model output and provide a strategic summary with specific budget reallocation recommendations. '
+        || 'Channel performance: ' || (SELECT LISTAGG(sub_channel || ': spend=$' || total_spend || ', attributed_rev=$' || total_attributed || ', ROI=' || overall_roi, '; ') FROM channel_summary)
+        || '. Provide 3-4 concise bullet points covering: top performing channels, underperforming channels, and specific reallocation recommendations with percentages.'
+    ) AS insight_text;
+
+----------------------------------------------------------------------
+-- 17. CLV_RISK_CLASSIFICATION -- Customer lifetime value tiers + churn
+----------------------------------------------------------------------
+CREATE OR REPLACE TABLE CLV_RISK_CLASSIFICATION AS
+WITH base AS (
+    SELECT
+        customer_id,
+        state,
+        age_group,
+        value_tier,
+        lifetime_value,
+        total_orders,
+        total_revenue,
+        days_since_last_order,
+        orders_per_month,
+        lifestyle_segment,
+        outdoor_interest,
+        LEAST(1.0, GREATEST(0.0,
+            0.6 * LEAST(1.0, COALESCE(days_since_last_order, 365) / 365.0)
+            + 0.4 * (1.0 - LEAST(1.0, COALESCE(orders_per_month, 0) / 2.0))
+        )) AS churn_risk_score
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CUSTOMER_ENRICHED
+)
+SELECT
+    customer_id,
+    CASE
+        WHEN lifetime_value >= 1500
+             AND COALESCE(days_since_last_order, 999) <= 60
+             AND churn_risk_score <= 0.20
+            THEN 'Loyal High-Value'
+        WHEN (lifetime_value >= 500 OR total_orders >= 3)
+             AND COALESCE(days_since_last_order, 999) <= 120
+            THEN 'Growth Potential'
+        WHEN total_orders <= 2
+             AND COALESCE(days_since_last_order, 0) <= 120
+            THEN 'New Customer'
+        WHEN COALESCE(days_since_last_order, 999) > 300
+             OR churn_risk_score > 0.85
+            THEN 'Lapsed'
+        WHEN COALESCE(days_since_last_order, 999) BETWEEN 121 AND 300
+             OR churn_risk_score BETWEEN 0.40 AND 0.75
+            THEN 'At-Risk'
+        ELSE 'Growth Potential'
+    END AS clv_tier,
+    lifetime_value,
+    ROUND(churn_risk_score, 3) AS churn_risk_score,
+    total_orders,
+    total_revenue,
+    days_since_last_order,
+    state,
+    age_group,
+    value_tier,
+    lifestyle_segment,
+    outdoor_interest
+FROM base;
+
+----------------------------------------------------------------------
+-- 18. DT_MTA_TOUCHPOINTS -- Multi-touch attribution touchpoints
+--     For each conversion (order), identifies all sub-channels the
+--     customer was exposed to within 30 days (one touch per sub-channel).
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_MTA_TOUCHPOINTS
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+WITH channel_touches AS (
+    SELECT
+        o.customer_id,
+        o.order_id AS conversion_id,
+        o.order_date AS conversion_date,
+        o.revenue,
+        c.sub_channel,
+        MIN(s.spend_date) AS first_touch_date,
+        MAX(s.spend_date) AS last_touch_date,
+        SUM(s.amount) AS channel_spend
+    FROM MARKETING_AI_BI.MARKETING_RAW.ORDERS o
+    JOIN MARKETING_AI_BI.MARKETING_RAW.MARKETING_SPEND s
+        ON s.spend_date BETWEEN DATEADD('day', -30, o.order_date) AND o.order_date
+        AND s.conversions > 0
+    JOIN MARKETING_AI_BI.MARKETING_RAW.CAMPAIGNS c
+        ON s.campaign_id = c.campaign_id
+    GROUP BY o.customer_id, o.order_id, o.order_date, o.revenue, c.sub_channel
+)
+SELECT
+    customer_id,
+    conversion_id,
+    conversion_date,
+    revenue,
+    sub_channel,
+    first_touch_date,
+    last_touch_date,
+    channel_spend,
+    DATEDIFF('day', first_touch_date, conversion_date) AS days_to_conversion,
+    ROW_NUMBER() OVER (
+        PARTITION BY conversion_id ORDER BY first_touch_date, sub_channel
+    ) AS touchpoint_sequence,
+    COUNT(*) OVER (PARTITION BY conversion_id) AS total_touchpoints
+FROM channel_touches;
+
+----------------------------------------------------------------------
+-- 19. DT_MTA_JOURNEY_SUMMARY -- Aggregated journey-level stats
+----------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE DT_MTA_JOURNEY_SUMMARY
+    TARGET_LAG = 'DOWNSTREAM'
+    WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    customer_id,
+    conversion_id,
+    revenue,
+    MIN(first_touch_date) AS first_touch_date,
+    MAX(last_touch_date) AS last_touch_date,
+    conversion_date,
+    MAX(total_touchpoints) AS total_touchpoints,
+    DATEDIFF('day', MIN(first_touch_date), conversion_date) AS journey_duration_days,
+    LISTAGG(DISTINCT sub_channel, ' > ') WITHIN GROUP (ORDER BY sub_channel) AS channel_path
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS
+GROUP BY customer_id, conversion_id, revenue, conversion_date;
+
+----------------------------------------------------------------------
+-- 20. V_FIRST_TOUCH_ATTRIBUTION -- 100% credit to first interaction
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_FIRST_TOUCH_ATTRIBUTION AS
+SELECT
+    conversion_id,
+    customer_id,
+    sub_channel,
+    touchpoint_sequence,
+    total_touchpoints,
+    revenue,
+    days_to_conversion,
+    CASE WHEN touchpoint_sequence = 1 THEN revenue ELSE 0 END AS attributed_revenue,
+    CASE WHEN touchpoint_sequence = 1 THEN 1.0 ELSE 0.0 END AS attribution_weight,
+    'first_touch' AS model_name
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS;
+
+----------------------------------------------------------------------
+-- 21. V_LAST_TOUCH_ATTRIBUTION -- 100% credit to last interaction
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_LAST_TOUCH_ATTRIBUTION AS
+SELECT
+    conversion_id,
+    customer_id,
+    sub_channel,
+    touchpoint_sequence,
+    total_touchpoints,
+    revenue,
+    days_to_conversion,
+    CASE WHEN touchpoint_sequence = total_touchpoints THEN revenue ELSE 0 END AS attributed_revenue,
+    CASE WHEN touchpoint_sequence = total_touchpoints THEN 1.0 ELSE 0.0 END AS attribution_weight,
+    'last_touch' AS model_name
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS;
+
+----------------------------------------------------------------------
+-- 22. V_LINEAR_ATTRIBUTION -- Equal credit across all touchpoints
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_LINEAR_ATTRIBUTION AS
+SELECT
+    conversion_id,
+    customer_id,
+    sub_channel,
+    touchpoint_sequence,
+    total_touchpoints,
+    revenue,
+    days_to_conversion,
+    ROUND(revenue / total_touchpoints, 2) AS attributed_revenue,
+    ROUND(1.0 / total_touchpoints, 4) AS attribution_weight,
+    'linear' AS model_name
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS;
+
+----------------------------------------------------------------------
+-- 23. V_TIME_DECAY_ATTRIBUTION -- More credit to recent touchpoints
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_TIME_DECAY_ATTRIBUTION AS
+WITH raw_weights AS (
+    SELECT *,
+        1.0 / (days_to_conversion + 1) AS raw_weight,
+        SUM(1.0 / (days_to_conversion + 1)) OVER (PARTITION BY conversion_id) AS total_weight
+    FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS
+)
+SELECT
+    conversion_id,
+    customer_id,
+    sub_channel,
+    touchpoint_sequence,
+    total_touchpoints,
+    revenue,
+    days_to_conversion,
+    ROUND(revenue * raw_weight / NULLIF(total_weight, 0), 2) AS attributed_revenue,
+    ROUND(raw_weight / NULLIF(total_weight, 0), 4) AS attribution_weight,
+    'time_decay' AS model_name
+FROM raw_weights;
+
+----------------------------------------------------------------------
+-- 24. V_POSITION_BASED_ATTRIBUTION -- 40% first, 40% last, 20% middle
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_POSITION_BASED_ATTRIBUTION AS
+SELECT
+    conversion_id,
+    customer_id,
+    sub_channel,
+    touchpoint_sequence,
+    total_touchpoints,
+    revenue,
+    days_to_conversion,
+    ROUND(CASE
+        WHEN total_touchpoints = 1 THEN revenue
+        WHEN total_touchpoints = 2 THEN revenue * 0.5
+        WHEN touchpoint_sequence = 1 THEN revenue * 0.4
+        WHEN touchpoint_sequence = total_touchpoints THEN revenue * 0.4
+        ELSE revenue * 0.2 / (total_touchpoints - 2)
+    END, 2) AS attributed_revenue,
+    ROUND(CASE
+        WHEN total_touchpoints = 1 THEN 1.0
+        WHEN total_touchpoints = 2 THEN 0.5
+        WHEN touchpoint_sequence = 1 THEN 0.4
+        WHEN touchpoint_sequence = total_touchpoints THEN 0.4
+        ELSE 0.2 / (total_touchpoints - 2)
+    END, 4) AS attribution_weight,
+    'position_based' AS model_name
+FROM MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_TOUCHPOINTS;
+
+----------------------------------------------------------------------
+-- 25. V_CHANNEL_ATTRIBUTION_SUMMARY -- Unified view across all 5 models
+----------------------------------------------------------------------
+CREATE OR REPLACE VIEW V_CHANNEL_ATTRIBUTION_SUMMARY AS
+SELECT
+    sub_channel,
+    model_name,
+    ROUND(SUM(attributed_revenue), 2) AS total_attributed_revenue,
+    COUNT(DISTINCT conversion_id) AS conversions_attributed
+FROM (
+    SELECT sub_channel, model_name, attributed_revenue, conversion_id FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_FIRST_TOUCH_ATTRIBUTION WHERE attributed_revenue > 0
+    UNION ALL
+    SELECT sub_channel, model_name, attributed_revenue, conversion_id FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_LAST_TOUCH_ATTRIBUTION WHERE attributed_revenue > 0
+    UNION ALL
+    SELECT sub_channel, model_name, attributed_revenue, conversion_id FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_LINEAR_ATTRIBUTION
+    UNION ALL
+    SELECT sub_channel, model_name, attributed_revenue, conversion_id FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_TIME_DECAY_ATTRIBUTION
+    UNION ALL
+    SELECT sub_channel, model_name, attributed_revenue, conversion_id FROM MARKETING_AI_BI.MARKETING_ANALYTICS.V_POSITION_BASED_ATTRIBUTION
+)
+GROUP BY sub_channel, model_name;
 
 ----------------------------------------------------------------------
 -- 12. GEO_WEATHER_TRIGGERS -- Weather-based campaign trigger actions

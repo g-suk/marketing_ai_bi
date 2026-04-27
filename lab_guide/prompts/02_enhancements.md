@@ -55,3 +55,26 @@ Once you have the base dashboard running, try pasting any of these follow-up pro
 ## Exportable Report
 
 > Add a "Download Report" button to each page that generates a PDF or HTML summary of the current page's charts and metrics using st.download_button. Include the chart images as base64-encoded PNGs and key metrics as formatted text.
+
+---
+
+## Interactive Marketing Targets
+
+> The dashboard includes hardcoded ROAS targets per channel (defined as `ROAS_TARGETS` dict
+> at the top of `streamlit_app.py`). To make these interactive, replace the hardcoded dict
+> with `st.sidebar.slider()` controls:
+>
+> ```python
+> with st.sidebar.expander("Set ROAS Targets"):
+>     for ch in ROAS_TARGETS:
+>         ROAS_TARGETS[ch] = st.slider(f"{ch} target ROAS", 5.0, 100.0, ROAS_TARGETS[ch], 1.0)
+>     ROAS_TARGET_OVERALL = st.slider("Overall target ROAS", 5.0, 100.0, 35.0, 1.0)
+> ```
+>
+> For persistent targets across sessions, create a `MARKETING_TARGETS` config table in
+> Snowflake and read/write targets with `session.sql()`. This lets multiple users share
+> the same target benchmarks.
+>
+> To extend beyond ROAS, add targets for CPA ceilings, conversion counts, or attribution
+> share percentages using the same pattern: dict of defaults, optional sliders, reference
+> lines on the corresponding charts.

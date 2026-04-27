@@ -245,7 +245,11 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
       COMMENT = 'Daily revenue with weather conditions and temperature bands',
     customer_enriched AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_CUSTOMER_ENRICHED
       PRIMARY KEY (customer_id)
-      COMMENT = 'Enriched customer profiles with marketplace data, purchase behavior, and demographics'
+      COMMENT = 'Enriched customer profiles with marketplace data, purchase behavior, and demographics',
+    attribution_summary AS MARKETING_AI_BI.MARKETING_ANALYTICS.V_CHANNEL_ATTRIBUTION_SUMMARY
+      COMMENT = 'Multi-touch attribution revenue by sub-channel across 5 models (first/last touch, linear, time-decay, position-based)',
+    journey_stats AS MARKETING_AI_BI.MARKETING_ANALYTICS.DT_MTA_JOURNEY_SUMMARY
+      COMMENT = 'Customer journey summaries with touchpoint counts and journey duration'
   )
   RELATIONSHIPS (
     clv_risk (customer_id) REFERENCES customer_enriched (customer_id)
@@ -273,7 +277,12 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
     weather_revenue.national_avg_temp_f AS weather_revenue.national_avg_temp_f COMMENT = 'National average temperature F',
     customer_enriched.lifetime_value AS customer_enriched.lifetime_value COMMENT = 'Customer lifetime value',
     customer_enriched.avg_order_value AS customer_enriched.avg_order_value COMMENT = 'Average order value',
-    customer_enriched.orders_per_month AS customer_enriched.orders_per_month COMMENT = 'Order frequency per month'
+    customer_enriched.orders_per_month AS customer_enriched.orders_per_month COMMENT = 'Order frequency per month',
+    attribution_summary.total_attributed_revenue AS attribution_summary.total_attributed_revenue COMMENT = 'Total attributed revenue for channel-model combination',
+    attribution_summary.conversions_attributed AS attribution_summary.conversions_attributed COMMENT = 'Conversions attributed to channel-model combination',
+    journey_stats.revenue AS journey_stats.revenue COMMENT = 'Conversion revenue',
+    journey_stats.total_touchpoints AS journey_stats.total_touchpoints COMMENT = 'Number of channels in the conversion journey',
+    journey_stats.journey_duration_days AS journey_stats.journey_duration_days COMMENT = 'Days from first touch to conversion'
   )
   DIMENSIONS (
     mmm_contributions.sub_channel AS mmm_contributions.sub_channel COMMENT = 'Marketing sub-channel',
@@ -287,7 +296,6 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
     geo_profiles.weather_recommended_category AS geo_profiles.weather_recommended_category COMMENT = 'Product category recommended based on weather',
     geo_profiles.recommended_channel AS geo_profiles.recommended_channel COMMENT = 'Recommended marketing channel for zip',
     geo_triggers.trigger_action AS geo_triggers.trigger_action COMMENT = 'Weather-triggered campaign action',
-    geo_triggers.recommended_product_category AS geo_triggers.recommended_product_category COMMENT = 'Product category triggered by weather',
     geo_recommendations.state AS geo_recommendations.state COMMENT = 'State for AI recommendation',
     geo_recommendations.recommendation AS geo_recommendations.recommendation COMMENT = 'AI-generated state targeting recommendation',
     clv_risk.clv_tier AS clv_risk.clv_tier COMMENT = 'CLV tier: Loyal High-Value, Growth Potential, At-Risk, New Customer, or Lapsed',
@@ -305,7 +313,10 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
     customer_enriched.age_group AS customer_enriched.age_group COMMENT = 'Customer age group',
     customer_enriched.value_tier AS customer_enriched.value_tier COMMENT = 'Customer value tier',
     customer_enriched.lifestyle_segment AS customer_enriched.lifestyle_segment COMMENT = 'Customer lifestyle from marketplace',
-    customer_enriched.outdoor_interest AS customer_enriched.outdoor_interest COMMENT = 'Customer outdoor interest from marketplace'
+    customer_enriched.outdoor_interest AS customer_enriched.outdoor_interest COMMENT = 'Customer outdoor interest from marketplace',
+    attribution_summary.sub_channel AS attribution_summary.sub_channel COMMENT = 'Marketing sub-channel for attribution',
+    attribution_summary.model_name AS attribution_summary.model_name COMMENT = 'Attribution model: first_touch, last_touch, linear, time_decay, or position_based',
+    journey_stats.channel_path AS journey_stats.channel_path COMMENT = 'Ordered channel path for the conversion journey'
   )
   METRICS (
     mmm_contributions.avg_roi AS AVG(mmm_contributions.roi) COMMENT = 'Average ROI across channels',
@@ -313,6 +324,9 @@ CREATE OR REPLACE SEMANTIC VIEW SV_SUMMIT_GEAR_ADVANCED
     geo_profiles.avg_targeting_score AS AVG(geo_profiles.targeting_score) COMMENT = 'Average targeting score',
     clv_risk.at_risk_count AS COUNT_IF(clv_risk.churn_risk_score >= 0.7) COMMENT = 'Number of at-risk or lapsed customers',
     clv_risk.avg_churn_risk AS AVG(clv_risk.churn_risk_score) COMMENT = 'Average churn risk score',
-    weather_revenue.avg_daily_revenue AS AVG(weather_revenue.total_revenue) COMMENT = 'Average daily revenue'
+    weather_revenue.avg_daily_revenue AS AVG(weather_revenue.total_revenue) COMMENT = 'Average daily revenue',
+    journey_stats.avg_touchpoints AS AVG(journey_stats.total_touchpoints) COMMENT = 'Average touchpoints per conversion journey',
+    journey_stats.avg_journey_days AS AVG(journey_stats.journey_duration_days) COMMENT = 'Average days from first touch to conversion',
+    journey_stats.total_conversions AS COUNT(journey_stats.conversion_id) COMMENT = 'Total number of conversions'
   )
-  COMMENT = 'Advanced analytics: Marketing Mix Modeling, Geo-Targeting, CLV Risk, and Weather Impact for Summit Gear Co.';
+  COMMENT = 'Advanced analytics: Marketing Mix Modeling, Multi-Touch Attribution, Geo-Targeting, CLV Risk, and Weather Impact for Summit Gear Co.';
