@@ -10,6 +10,8 @@
 - Cortex Code enabled (for dashboard building)
 - Web browser with Snowsight
 
+> **Doing the lab at a live event?** Your facilitator has already pre-loaded the Marketplace data and deployed the backup Streamlit app. You can skip **0.1** (database/schema creation), **0.4** (Marketplace listing installation), and the **Backup App** section in Part 5. Start at **0.2** to create your workspace, then run the setup script at **0.3**.
+
 ---
 
 ## Part 0: Environment Setup (0-5 min)
@@ -273,8 +275,8 @@ USE SCHEMA MARKETING_RAW;
 PUT file:///path/to/streamlit/streamlit_app.py @STREAMLIT_STAGE/streamlit/ AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
 PUT file:///path/to/streamlit/environment.yml @STREAMLIT_STAGE/streamlit/ AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
 
-CREATE STREAMLIT MARKETING_AI_BI.MARKETING_RAW.SUMMIT_GEAR_DASHBOARD
-  ROOT_LOCATION = '@MARKETING_AI_BI.MARKETING_RAW.STREAMLIT_STAGE/streamlit'
+CREATE STREAMLIT MARKETING_AI_BI.MARKETING_ANALYTICS.SUMMIT_GEAR_DASHBOARD_BACKUP
+  ROOT_LOCATION = '@MARKETING_AI_BI.MARKETING_ANALYTICS.STREAMLIT_STAGE/streamlit'
   MAIN_FILE = 'streamlit_app.py'
   QUERY_WAREHOUSE = 'COMPUTE_WH';
 ```

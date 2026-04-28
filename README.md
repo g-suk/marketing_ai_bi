@@ -4,6 +4,8 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ## Quick Start
 
+> **Doing the lab at a live event?** The Marketplace data and backup Streamlit app have already been set up for you. Skip Step 1 and the Marketplace Listings section below -- jump straight to the Lab Guide. Your facilitator will provide the account details.
+
 ### Step 1: Create the Database and Git Integration
 
 As ACCOUNTADMIN, open a SQL worksheet and run:

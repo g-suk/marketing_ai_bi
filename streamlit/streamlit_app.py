@@ -6,7 +6,7 @@ import json
 import _snowflake
 from snowflake.snowpark.context import get_active_session
 
-st.set_page_config(page_title="Summit Gear Co. Marketing", layout="wide", page_icon="⛰️")
+st.set_page_config(page_title="Summit Gear Co. Marketing (Backup)", layout="wide", page_icon="⛰️")
 
 session = get_active_session()
 
