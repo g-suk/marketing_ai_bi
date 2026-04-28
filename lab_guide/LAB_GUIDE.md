@@ -259,11 +259,22 @@ This is the creative section! You'll use **Cortex Code** to build a Streamlit da
 
 > **Why Streamlit in Snowflake?** Streamlit in Snowflake (SiS) lets you build and deploy interactive data applications without leaving the Snowflake platform -- no separate hosting, no authentication setup, no data movement. The app runs inside Snowflake's security boundary with a pre-authenticated session, governed by the same roles and privileges as your SQL queries. Combined with everything built in this lab, a single prompt to Cortex Code produces a 5-page dashboard that queries semantic views, displays ML forecasts and anomalies, renders AI-generated insights, and embeds a conversational agent -- all running natively in Snowflake. This is the full stack: data ingestion (Marketplace), transformation (Dynamic Tables), ML (Forecast/Anomaly), AI (Cortex Functions), semantic layer (Semantic Views), conversational AI (Cortex Agent), and application (Streamlit) -- entirely within one platform, governed by one set of policies, and built with SQL and a single prompt.
 
+### Upload the Streamlit Helper Skill
+
+Before prompting Cortex Code, upload the helper skill so it knows Streamlit-in-Snowflake constraints, Cortex Agent parsing patterns, and Altair charting conventions.
+
+1. Open **Cortex Code** in your Snowflake account
+2. Click the **Skills** icon (puzzle piece) in the left sidebar
+3. Click **+ Add Skill**
+4. Navigate to the `helper_streamlit_skill` folder in your workspace and select `SKILL.md`
+5. The skill is now loaded for this session -- Cortex Code will reference it automatically when building Streamlit apps
+
+> **What is a skill?** A skill is a markdown file you upload to Cortex Code that gives it specialized knowledge for a particular task. Think of it as a "cheat sheet" -- it teaches Cortex Code domain-specific rules, code patterns, API conventions, and guardrails that it wouldn't otherwise know. Without the skill, Cortex Code might use plotly (which doesn't work in SiS), miss the Cortex Agent response parser format, or forget that Snowflake returns uppercase column names. With the skill loaded, it follows all of these constraints automatically. You can create skills for any domain -- dbt conventions, internal API patterns, team coding standards -- and share them across your organization.
+
 ### Getting Started
 
-1. Open Cortex Code in your Snowflake account
-2. Start a new conversation
-3. Paste the prompt from `prompts/01_build_dashboard.md`
+1. Start a new conversation in Cortex Code
+2. Paste the prompt from `prompts/01_build_dashboard.md`
 
 This single prompt gives Cortex Code everything it needs to generate a full 5-page dashboard with KPIs, channel analytics, forecasting, AI insights, and the Cortex Agent chat interface.
 
