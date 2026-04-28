@@ -10,7 +10,7 @@
 - Cortex Code enabled (for dashboard building)
 - Web browser with Snowsight
 
-> **Doing the lab at a live event?** Your facilitator has already pre-loaded the Marketplace data and deployed the backup Streamlit app. You can skip **0.1** (database/schema creation), **0.4** (Marketplace listing installation), and the **Backup App** section in Part 5. Start at **0.2** to create your workspace, then run the setup script at **0.3**.
+> **Doing the lab at a live event?** Your facilitator has already pre-loaded the Snowflake Public Data listing and deployed the backup Streamlit app. In **0.4**, skip listing #1 (Snowflake Public Data) -- you still need to install the other three listings. You can also skip **0.1** (database/schema creation) and the **Backup App** section in Part 5. Start at **0.2** to create your workspace, then run the setup script at **0.3**.
 
 ---
 

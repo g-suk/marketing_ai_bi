@@ -4,7 +4,7 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ## Quick Start
 
-> **Doing the lab at a live event?** The Marketplace data and backup Streamlit app have already been set up for you. Skip Step 1 and the Marketplace Listings section below -- jump straight to the Lab Guide. Your facilitator will provide the account details.
+> **Doing the lab at a live event?** Snowflake Public Data has already been pre-loaded and the backup Streamlit app is deployed for you. You still need to install the other three Marketplace listings (SMS CustomerConnect 360, GWI Core, Weather Source). Skip Step 1 and jump straight to the Lab Guide -- your facilitator will provide the account details.
 
 ### Step 1: Create the Database and Git Integration
 
@@ -198,7 +198,7 @@ Install these free listings from **Data Products > Marketplace** in Snowsight:
 
 | Listing | Database Name |
 |---------|--------------|
-| [Snowflake Public Data](https://app.snowflake.com/marketplace/listing/GZTSZ290BV255) | `SNOWFLAKE_PUBLIC_DATA_PAID` |
+| [Snowflake Public Data](https://app.snowflake.com/marketplace/listing/GZTSZ290BV255) *(pre-loaded at live events)* | `SNOWFLAKE_PUBLIC_DATA_PAID` |
 | [SMS CustomerConnect 360 Sample](https://app.snowflake.com/marketplace/listing/GZT0ZU1ICEX) | `CUSTOMERCONNECT360__SAMPLE` |
 | [GWI Core](https://app.snowflake.com/marketplace/listing/GZ2FSZGU5YB) | `GWI_OPEN_DATA` |
 | [Weather Source Global Weather](https://app.snowflake.com/marketplace/listing/GZSOZ1LLD8) | `FROSTBYTE_WEATHERSOURCE` |
