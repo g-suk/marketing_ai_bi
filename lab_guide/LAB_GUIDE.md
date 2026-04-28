@@ -18,6 +18,8 @@
 
 ### 0.1 Create the Database, Schema, and Git Integration
 
+> **Live event attendees: This step has already been done for you. Do not execute this -- skip to 0.2.**
+
 Open a SQL worksheet as ACCOUNTADMIN and run:
 
 ```sql
@@ -30,6 +32,24 @@ CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/g-suk')
   ENABLED = TRUE;
+
+CREATE ROLE IF NOT EXISTS MARKETING_LAB_ROLE;
+GRANT ROLE MARKETING_LAB_ROLE TO ROLE SYSADMIN;
+
+GRANT OWNERSHIP ON DATABASE MARKETING_AI_BI TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON SCHEMA MARKETING_AI_BI.MARKETING_RAW TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
+
+CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_ANALYTICS;
+GRANT OWNERSHIP ON SCHEMA MARKETING_AI_BI.MARKETING_ANALYTICS TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
+
+CREATE OR REPLACE WAREHOUSE COMPUTE_WH
+  WAREHOUSE_SIZE = MEDIUM
+  GENERATION = '2'
+  AUTO_SUSPEND = 300;
+
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE MARKETING_LAB_ROLE;
+
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE MARKETING_LAB_ROLE;
 ```
 
 ### 0.2 Create a Workspace from Git
@@ -58,7 +78,7 @@ This creates:
 
 Navigate to **Data Products > Marketplace** and install these free listings:
 
-1. **Snowflake Public Data** -- [Install](https://app.snowflake.com/marketplace/listing/GZTSZ290BV255)
+1. **Snowflake Public Data** *(pre-loaded at live events)* -- [Install](https://app.snowflake.com/marketplace/listing/GZTSZ290BV255)
    - Installs as database: `SNOWFLAKE_PUBLIC_DATA_PAID`
 2. **SMS CustomerConnect 360 Sample** -- [Install](https://app.snowflake.com/marketplace/listing/GZT0ZU1ICEX)
    - Installs as database: `CUSTOMERCONNECT360__SAMPLE`

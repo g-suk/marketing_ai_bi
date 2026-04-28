@@ -4,59 +4,11 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ## Quick Start
 
-> **Doing the lab at a live event?** Snowflake Public Data has already been pre-loaded and the backup Streamlit app is deployed for you. You still need to install the other three Marketplace listings (SMS CustomerConnect 360, GWI Core, Weather Source). Skip Step 1 and jump straight to the Lab Guide -- your facilitator will provide the account details.
+> **Doing the lab at a live event?** Snowflake Public Data has already been pre-loaded and the backup Streamlit app is deployed for you. You still need to install the other three Marketplace listings (SMS CustomerConnect 360, GWI Core, Weather Source). Your facilitator will provide the account details.
 
-### Step 1: Create the Database and Git Integration
+For full setup instructions (database creation, Git workspace, Marketplace listings, and grants), see [**Lab Guide -- Part 0: Environment Setup**](lab_guide/LAB_GUIDE.md#part-0-environment-setup-0-5-min).
 
-> **Live event attendees: This step has already been done for you. Do not execute this -- skip to Step 2.**
-
-As ACCOUNTADMIN, open a SQL worksheet and run:
-
-```sql
-USE ROLE ACCOUNTADMIN;
-
-CREATE OR REPLACE DATABASE MARKETING_AI_BI;
-CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_RAW;
-
-CREATE OR REPLACE API INTEGRATION github_api_integration
-  API_PROVIDER = git_https_api
-  API_ALLOWED_PREFIXES = ('https://github.com/g-suk')
-  ENABLED = TRUE;
-
-CREATE ROLE IF NOT EXISTS MARKETING_LAB_ROLE;
-GRANT ROLE MARKETING_LAB_ROLE TO ROLE SYSADMIN;
-
-GRANT OWNERSHIP ON DATABASE MARKETING_AI_BI TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
-GRANT OWNERSHIP ON SCHEMA MARKETING_AI_BI.MARKETING_RAW TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
-
-CREATE SCHEMA IF NOT EXISTS MARKETING_AI_BI.MARKETING_ANALYTICS;
-GRANT OWNERSHIP ON SCHEMA MARKETING_AI_BI.MARKETING_ANALYTICS TO ROLE MARKETING_LAB_ROLE COPY CURRENT GRANTS;
-
-CREATE OR REPLACE WAREHOUSE COMPUTE_WH
-  WAREHOUSE_SIZE = MEDIUM
-  GENERATION = '2'
-  AUTO_SUSPEND = 300;
-
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE MARKETING_LAB_ROLE;
-
-GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE MARKETING_LAB_ROLE;
-```
-
-### Step 2: Create a Workspace from Git
-
-1. In Snowsight, navigate to **Projects > Workspaces**
-2. Click **+ Create Workspace** (top right)
-3. Select **Create Workspace from Git Repository**
-4. Paste the repository URL: `https://github.com/g-suk/marketing_ai_bi.git`
-5. Select **Public Repository** (no credentials needed)
-6. If it asks for Database and schema, choose database `MARKETING_AI_BI` and schema `MARKETING_RAW`
-7. Click **Create**
-
-You now have a full workspace with all lab SQL files ready to open and run.
-
-### Step 3: Follow the Lab Guide
-
-Open `lab_guide/LAB_GUIDE.md` and work through each part. You'll open each SQL file in the workspace, review what it does, and run it step by step.
+Once your environment is ready, open `lab_guide/LAB_GUIDE.md` and work through each part. You'll open each SQL file in the workspace, review what it does, and run it step by step.
 
 ## Architecture
 
@@ -75,27 +27,6 @@ Open `lab_guide/LAB_GUIDE.md` and work through each part. You'll open each SQL f
 - **Cortex AI:** Sentiment analysis, classification, extraction, summarization, MMM insights, geo-targeting recommendations
 - **Semantic views + Agent:** 4 semantic views (27 entities total) backing a natural language Q&A agent with 4 specialized tools
 - **Streamlit dashboard:** 5-page app with KPI Overview, Advanced Analytics (4 tabs: MMM, MTA, Geo-Targeting, CLV & Churn), Forecasting & Anomalies, AI Insights, and Marketing Agent
-
-## Marketplace Listings
-
-Install these free listings from **Data Products > Marketplace** in Snowsight:
-
-| Listing | Database Name |
-|---------|--------------|
-| [Snowflake Public Data](https://app.snowflake.com/marketplace/listing/GZTSZ290BV255) *(pre-loaded at live events)* | `SNOWFLAKE_PUBLIC_DATA_PAID` |
-| [SMS CustomerConnect 360 Sample](https://app.snowflake.com/marketplace/listing/GZT0ZU1ICEX) | `CUSTOMERCONNECT360__SAMPLE` |
-| [GWI Core](https://app.snowflake.com/marketplace/listing/GZ2FSZGU5YB) | `GWI_OPEN_DATA` |
-| [Weather Source Global Weather](https://app.snowflake.com/marketplace/listing/GZSOZ1LLD8) | `FROSTBYTE_WEATHERSOURCE` |
-
-After installing, grant access:
-
-```sql
-USE ROLE ACCOUNTADMIN;
-GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE_PUBLIC_DATA_PAID TO ROLE MARKETING_LAB_ROLE;
-GRANT IMPORTED PRIVILEGES ON DATABASE CUSTOMERCONNECT360__SAMPLE TO ROLE MARKETING_LAB_ROLE;
-GRANT IMPORTED PRIVILEGES ON DATABASE GWI_OPEN_DATA              TO ROLE MARKETING_LAB_ROLE;
-GRANT IMPORTED PRIVILEGES ON DATABASE FROSTBYTE_WEATHERSOURCE    TO ROLE MARKETING_LAB_ROLE;
-```
 
 ## File Structure
 
