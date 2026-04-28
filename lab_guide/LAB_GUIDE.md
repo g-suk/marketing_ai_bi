@@ -84,7 +84,7 @@ Navigate to **Data Products > Marketplace** and install these free listings:
    - Installs as database: `CUSTOMERCONNECT360__SAMPLE`
 3. **GWI Core** -- [Install](https://app.snowflake.com/marketplace/listing/GZ2FSZGU5YB)
    - Installs as database: `GWI_OPEN_DATA`
-4. **Weather Source Global Weather** -- [Install](https://app.snowflake.com/marketplace/listing/GZSOZ1LLD8)
+4. **Pelmorex Weather Source: Frostbyte** -- [Install](https://app.snowflake.com/marketplace/listing/GZSOZ1LLEL)
    - Installs as database: `FROSTBYTE_WEATHERSOURCE`
 
 After installing, grant access. As ACCOUNTADMIN:
