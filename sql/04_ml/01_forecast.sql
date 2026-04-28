@@ -12,9 +12,10 @@
   Results stored in: FORECAST_RESULTS, FORECAST_FEATURE_IMPORTANCE
 =============================================================================*/
 
+USE ROLE MARKETING_LAB_ROLE;
+USE WAREHOUSE COMPUTE_WH;
 USE DATABASE MARKETING_AI_BI;
 USE SCHEMA MARKETING_ANALYTICS;
-USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
 -- Result tables

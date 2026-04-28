@@ -19,6 +19,8 @@
     Weather Source         -> FROSTBYTE_WEATHERSOURCE.ONPOINT_ID
 =============================================================================*/
 
+USE ROLE MARKETING_LAB_ROLE;
+USE WAREHOUSE COMPUTE_WH;
 USE DATABASE MARKETING_AI_BI;
 USE SCHEMA MARKETING_RAW;
 

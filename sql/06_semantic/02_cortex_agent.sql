@@ -11,9 +11,10 @@
   Participants use this agent in the Streamlit dashboard for natural language Q&A.
 =============================================================================*/
 
+USE ROLE MARKETING_LAB_ROLE;
+USE WAREHOUSE COMPUTE_WH;
 USE DATABASE MARKETING_AI_BI;
 USE SCHEMA MARKETING_ANALYTICS;
-USE WAREHOUSE COMPUTE_WH;
 
 create or replace agent SUMMIT_GEAR_AGENT
 comment='Natural language Q&A agent for Summit Gear Co. marketing analytics'

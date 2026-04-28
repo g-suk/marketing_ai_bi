@@ -14,9 +14,10 @@
     6. AI_COMPLETE for geo-targeted state recommendations
 =============================================================================*/
 
+USE ROLE MARKETING_LAB_ROLE;
+USE WAREHOUSE COMPUTE_WH;
 USE DATABASE MARKETING_AI_BI;
 USE SCHEMA MARKETING_ANALYTICS;
-USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
 -- 1. AI_SENTIMENT -- Review sentiment scoring

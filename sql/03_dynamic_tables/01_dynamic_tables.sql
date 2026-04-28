@@ -23,9 +23,10 @@
   Data > Databases > MARKETING_AI_BI > MARKETING_ANALYTICS > Dynamic Tables
 =============================================================================*/
 
+USE ROLE MARKETING_LAB_ROLE;
+USE WAREHOUSE COMPUTE_WH;
 USE DATABASE MARKETING_AI_BI;
 USE SCHEMA MARKETING_ANALYTICS;
-USE WAREHOUSE COMPUTE_WH;
 
 ----------------------------------------------------------------------
 -- 1. DT_DAILY_REVENUE -- Daily revenue by channel
