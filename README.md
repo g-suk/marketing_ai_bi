@@ -8,6 +8,8 @@ A 60-minute hands-on lab showcasing Snowflake's AI, ML, Marketplace, Dynamic Tab
 
 ### Step 1: Create the Database and Git Integration
 
+> **Live event attendees: This step has already been done for you. Do not execute this -- skip to Step 2.**
+
 As ACCOUNTADMIN, open a SQL worksheet and run:
 
 ```sql
@@ -47,7 +49,7 @@ GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE MARKETING_LAB_ROLE;
 3. Select **Create Workspace from Git Repository**
 4. Paste the repository URL: `https://github.com/g-suk/marketing_ai_bi.git`
 5. Select **Public Repository** (no credentials needed)
-6. Choose database `MARKETING_AI_BI` and schema `MARKETING_RAW`
+6. If it asks for Database and schema, choose database `MARKETING_AI_BI` and schema `MARKETING_RAW`
 7. Click **Create**
 
 You now have a full workspace with all lab SQL files ready to open and run.
